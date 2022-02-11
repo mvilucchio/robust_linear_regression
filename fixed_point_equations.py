@@ -7,8 +7,8 @@ from tqdm.auto import tqdm
 def state_equations(var_func, var_hat_func, delta = .001, lambd = .01, alpha = .5, init=(.5, .5, 0.5)):
     m, q, sigma = init[0], init[1], init[2]
     err = 1.0
-    blend = .6
-    while err > 1e-4:
+    blend = .7
+    while err > 1e-6:
         m_hat, q_hat, sigma_hat = var_hat_func(m, q, sigma, alpha, delta)
 
         temp_m, temp_q, temp_sigma = m, q, sigma
@@ -20,6 +20,26 @@ def state_equations(var_func, var_hat_func, delta = .001, lambd = .01, alpha = .
         m = blend * m + (1 - blend)*temp_m
         q = blend * q + (1 - blend)*temp_q
         sigma = blend * sigma + (1 - blend) * temp_sigma
+
+    return m, q, sigma
+
+def state_equations_max_iters(var_func, var_hat_func, n_max = 1000, delta = .001, lambd = .01, alpha = .5, init=(.5, .5, 0.5)):
+    m, q, sigma = init[0], init[1], init[2]
+    err = 1.0
+    blend = .7
+    for _ in range(n_max):
+        m_hat, q_hat, sigma_hat = var_hat_func(m, q, sigma, alpha, delta)
+
+        temp_m, temp_q, temp_sigma = m, q, sigma
+
+        m, q, sigma = var_func(m_hat, q_hat, sigma_hat, alpha, delta, lambd)
+
+        err = np.min(np.abs([temp_m - m, temp_q - q, temp_sigma - sigma]))
+
+        m = blend * m + (1 - blend)*temp_m
+        q = blend * q + (1 - blend)*temp_q
+        sigma = blend * sigma + (1 - blend) * temp_sigma
+
     return m, q, sigma
 
 def projection_ridge_different_alpha_theory(
@@ -50,16 +70,22 @@ def var_func_L2(m_hat, q_hat, sigma_hat, alpha, delta, lambd):
     sigma = 1.0 / (sigma_hat + lambd)
     return m, q, sigma
 
-def var_hat_func_L2_old(m, q, sigma, alpha, delta):
-    m_hat = alpha * ( 1 + q + delta - 2 * np.abs(m) ) / (1 + sigma + sigma * delta + np.square(sigma))
-    q_hat = alpha * ( 1 + q + delta - 2 * np.abs(m) ) / (np.square(1 + sigma)**2)
+def var_hat_func_L2(m, q, sigma, alpha, delta):
+    m_hat = alpha / (1 + sigma)
+    q_hat = alpha * (1 + q + delta - 2 * np.abs(m)) / ((1 + sigma)**2)
     sigma_hat = alpha / (1 + sigma)
     return m_hat, q_hat, sigma_hat
 
-def var_hat_func_L2(m, q, sigma, alpha, delta):
-    m_hat = np.exp( np.log(alpha) + np.log( (1 + q + delta) * q - 2 * np.abs(m) * np.abs(q) ) - np.log(1 + sigma) - np.log(-m**2 + q + q * delta) )
-    q_hat = np.exp( np.log(alpha) + np.log( 1 + q + delta - 2 * np.abs(m) * np.abs(q) ) - 2 * np.log(1 + sigma) )
-    sigma_hat = np.exp( np.log(alpha) - np.log(1 + sigma) )
+def var_hat_func_L2_num(m, q, sigma, alpha, delta):
+    
+    return m_hat, q_hat, sigma_hat
+
+def var_hat_func_L1(m, q, sigma, alpha, delta):
+    
+    return m_hat, q_hat, sigma_hat
+
+def var_hat_func_Huber(m, q, sigma, alpha, delta):
+
     return m_hat, q_hat, sigma_hat
 
 if __name__ == "__main__":
@@ -67,21 +93,15 @@ if __name__ == "__main__":
     alpha_points = 300
     d = 400
     reps = 10
-    deltas = [1.0]
+    deltas = [0.2]
     lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
     alphas = [None] * len(deltas) * len(lambdas)
     errors = [None] * len(deltas) * len(lambdas)
 
-    # [0.5901902077981088, 0.28447735938853747, 0.035259033506493065]
-    # [0.5045545439009574, 0.09866014515067846, 0.1679863461219322]
-    # [0.46275214656501307, 0.0020789983990862626, 0.1352132339821043]
-    # [0.46279572327820095, 0.030911413518507902, 0.11332237743716589]
-    # [0.47301776670766954, 0.010558530385502153, 0.05870574188749017]
-    # [0.48687626831694986, 0.027328631552434313, 0.1308988879050807].png
     # m = 0.05 * np.random.random() + 0.45
-    #                 q = 0.02 * np.random.random() + 0.01
-    #                 sigma = 0.1 * np.random.random() + 0.05
+    # q = 0.02 * np.random.random() + 0.01
+    # sigma = 0.1 * np.random.random() + 0.05
 
     for idx, l in enumerate(lambdas):
         for jdx, delta in enumerate(deltas):
@@ -106,7 +126,7 @@ if __name__ == "__main__":
                 delta = delta,
                 initial_cond = initial
             )
-            print(initial)
+            # print(initial)
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 

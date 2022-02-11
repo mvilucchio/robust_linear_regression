@@ -82,13 +82,30 @@ def find_coefficients_ridge(ys, xs, l = 1.0):
     b = np.divide(xs.T.dot(ys), np.sqrt(d))
     return np.linalg.solve(a, b)
 
+def find_coefficients_L1(ys, xs, l = 1.0, n_max = 1000, learning_rate = 0.01):
+    n, d = xs.shape
+    w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+    xs_norm = np.divide(xs, np.sqrt(d))
+    # print("-----", np.sign(ys - xs_norm @ w).shape)
+    # print((xs_norm).shape)
+    # print(w.shape)
+    for _ in range(n_max):
+        grad = - np.sign(ys - xs_norm @ w) @ (xs_norm) + l * w
+        w -= learning_rate * grad
+    return w
+
+# def find_coefficients_Huber(ys, xs, l = 1.0):
+
+#     return coeff
+
 if __name__ == "__main__":
+    loss = "L1"
     alpha_min, alpha_max = 0.01, 100
     alpha_points = 21
     d = 400
     reps = 10
     deltas = [1.0]
-    lambdas = [0.1, 1.0, 10.0, 100.0]
+    lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
     alphas = [None] * len(deltas) * len(lambdas)
     final_errors_mean = [None] * len(deltas) * len(lambdas)
@@ -97,15 +114,28 @@ if __name__ == "__main__":
     for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
         for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
             i = idx * len(deltas) +  jdx
-            alphas[i], final_errors_mean[i], final_errors_std[i] = generate_different_alpha(
-                find_coefficients_ridge, 
-                delta = delta, 
-                alpha_1 = alpha_min, alpha_2 = alpha_max, 
-                n_features = d, 
-                n_alpha_points = alpha_points, 
-                repetitions = reps, 
-                lambda_reg = l
-            )
+
+            if loss == "L2":
+                alphas[i], final_errors_mean[i], final_errors_std[i] = generate_different_alpha(
+                    find_coefficients_ridge, 
+                    delta = delta, 
+                    alpha_1 = alpha_min, alpha_2 = alpha_max, 
+                    n_features = d, 
+                    n_alpha_points = alpha_points, 
+                    repetitions = reps, 
+                    lambda_reg = l
+                )
+            elif loss == "L1":
+                alphas[i], final_errors_mean[i], final_errors_std[i] = generate_different_alpha(
+                    find_coefficients_L1, 
+                    delta = delta, 
+                    alpha_1 = alpha_min, alpha_2 = alpha_max, 
+                    n_features = d, 
+                    n_alpha_points = alpha_points, 
+                    repetitions = reps, 
+                    lambda_reg = l
+                )
+
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
@@ -121,7 +151,7 @@ if __name__ == "__main__":
                 label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta)
             )
     
-    ax.set_title("L2 Loss")
+    ax.set_title("{} Loss".format(loss))
     ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
     ax.set_xlabel(r"$\alpha$")
     ax.set_xscale('log')
