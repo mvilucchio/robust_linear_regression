@@ -14,11 +14,11 @@ def get_cmap(n, name='hsv'):
     return plt.cm.get_cmap(name, n)
 
 alpha_min, alpha_max = 0.01, 100
-alpha_points_theory = 100
+alpha_points_theory = 75
 alpha_points_num = 15
-d = 500
+d = 400
 reps = 10
-deltas = [0.1, 1.0, 10.0]
+deltas = [1.0]
 lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
 colormap = cmap = get_cmap(len(lambdas) * len(deltas))
@@ -46,16 +46,16 @@ errors = [None] * len(deltas) * len(lambdas)
 
 for idx, l in enumerate(lambdas):
     for jdx, delta in enumerate(deltas):
+        i = idx * len(deltas) + jdx
+
         while True:
             m = np.random.random() # 0.1 * np.random.random() 
             q = np.random.random() # 0.3 * np.random.random() + 0.1 # np.random.random()
-            sigma = np.random.random() # 0.1 * np.random.random() + 0.05 # np.random.random()
+            sigma = np.random.random() # 0.1 * np.random.random() + 0.05 # np.random.random()
             if np.square(m) < q + delta * q:
                 break
-
+            
         initial = [m, q, sigma]
-
-        i = idx * len(deltas) + jdx
 
         alphas_theory[i], errors[i] = fpe.projection_ridge_different_alpha_theory(
             fpe.var_func_L2, 
@@ -101,6 +101,6 @@ ax.minorticks_on()
 ax.grid(True, which='both')
 ax.legend()
 
-fig.savefig("./imgs/{}.png".format(random_number), format='png')
+fig.savefig("./imgs/{} - [{:.3f}, {:.3f}, {:.3f}].png".format(random_number, *initial), format='png')
 
 plt.show()

@@ -3,12 +3,13 @@ import matplotlib.pyplot as plt
 from scipy.stats import norm
 import scipy.stats as stats
 from tqdm.auto import tqdm
+import numerical_functions as numfun
 
 def state_equations(var_func, var_hat_func, delta = .001, lambd = .01, alpha = .5, init=(.5, .5, 0.5)):
     m, q, sigma = init[0], init[1], init[2]
     err = 1.0
     blend = .7
-    while err > 1e-6:
+    while err > 1e-7:
         m_hat, q_hat, sigma_hat = var_hat_func(m, q, sigma, alpha, delta)
 
         temp_m, temp_q, temp_sigma = m, q, sigma
@@ -48,9 +49,10 @@ def projection_ridge_different_alpha_theory(
         alpha_1 = 0.01, 
         alpha_2 = 100, 
         n_alpha_points = 16, 
-        lambd = 0.01, 
+        lambd = 0.1, 
         delta = 1.0, 
-        initial_cond = [0.6, 0.00, 0.00]
+        initial_cond = [0.6, 0.0, 0.0],
+        verbose = False
     ):
     
     alphas = np.logspace(np.log(alpha_1)/np.log(10), np.log(alpha_2)/np.log(10), n_alpha_points)
@@ -58,7 +60,7 @@ def projection_ridge_different_alpha_theory(
     initial = initial_cond
     error_theory = np.zeros(n_alpha_points)
 
-    for i, alpha in enumerate(alphas):
+    for i, alpha in enumerate(tqdm(alphas, desc="alpha", disable=not verbose, leave=False)):
         m, q, _ = state_equations(var_func, var_hat_func, delta, lambd, alpha, init=initial)
         error_theory[i] = 1 + q - 2*m
     
@@ -77,34 +79,38 @@ def var_hat_func_L2(m, q, sigma, alpha, delta):
     return m_hat, q_hat, sigma_hat
 
 def var_hat_func_L2_num(m, q, sigma, alpha, delta):
+    m_hat = alpha * numfun.m_hat_equation_L2(m, q, sigma, delta)
+    q_hat = alpha * numfun.q_hat_equation_L2(m, q, sigma, delta)
+    sigma_hat = - alpha * numfun.sigma_hat_equation_L2(m, q, sigma, delta)
+    return m_hat, q_hat, sigma_hat
+
+# def var_hat_func_L1_num(m, q, sigma, alpha, delta):
     
-    return m_hat, q_hat, sigma_hat
+#     return m_hat, q_hat, sigma_hat
 
-def var_hat_func_L1(m, q, sigma, alpha, delta):
-    
-    return m_hat, q_hat, sigma_hat
+# def var_hat_func_Huber_num(m, q, sigma, alpha, delta):
 
-def var_hat_func_Huber(m, q, sigma, alpha, delta):
-
-    return m_hat, q_hat, sigma_hat
+#     return m_hat, q_hat, sigma_hat
 
 if __name__ == "__main__":
     alpha_min, alpha_max = 0.01, 100
-    alpha_points = 300
-    d = 400
-    reps = 10
-    deltas = [0.2]
-    lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
+    alpha_points_int = 20
+    alpha_points_an = 50
+    deltas = [1.0]
+    lambdas = [0.1, 1.0, 10.0]
 
-    alphas = [None] * len(deltas) * len(lambdas)
-    errors = [None] * len(deltas) * len(lambdas)
+    alphas_int = [None] * len(deltas) * len(lambdas)
+    errors_int = [None] * len(deltas) * len(lambdas)
+
+    alphas_an = [None] * len(deltas) * len(lambdas)
+    errors_an = [None] * len(deltas) * len(lambdas)
 
     # m = 0.05 * np.random.random() + 0.45
     # q = 0.02 * np.random.random() + 0.01
     # sigma = 0.1 * np.random.random() + 0.05
 
-    for idx, l in enumerate(lambdas):
-        for jdx, delta in enumerate(deltas):
+    for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
+        for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
             while True:
                 m = np.random.random()
                 q = np.random.random()
@@ -116,15 +122,42 @@ if __name__ == "__main__":
 
             i = idx * len(deltas) + jdx
 
-            alphas[i], errors[i] = projection_ridge_different_alpha_theory(
+            alphas_int[i], errors_int[i] = projection_ridge_different_alpha_theory(
+                var_func_L2, 
+                var_hat_func_L2_num, 
+                alpha_1 = alpha_min, 
+                alpha_2 = alpha_max, 
+                n_alpha_points = alpha_points_int, 
+                lambd = l, 
+                delta = delta,
+                initial_cond = initial,
+                verbose = True
+            )
+            # print(initial)
+
+    for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
+        for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
+            while True:
+                m = np.random.random()
+                q = np.random.random()
+                sigma = np.random.random()
+                if np.square(m) < q + delta * q:
+                    break
+
+            initial = [m, q, sigma]
+
+            i = idx * len(deltas) + jdx
+
+            alphas_an[i], errors_an[i] = projection_ridge_different_alpha_theory(
                 var_func_L2, 
                 var_hat_func_L2, 
                 alpha_1 = alpha_min, 
                 alpha_2 = alpha_max, 
-                n_alpha_points = alpha_points, 
+                n_alpha_points = alpha_points_an, 
                 lambd = l, 
                 delta = delta,
-                initial_cond = initial
+                initial_cond = initial,
+                verbose = True
             )
             # print(initial)
 
@@ -134,9 +167,15 @@ if __name__ == "__main__":
         for jdx, delta in enumerate(deltas):
             i = idx * len(deltas) + jdx
             ax.plot(
-                alphas[i], 
-                errors[i],
+                alphas_int[i], 
+                errors_int[i],
                 marker='.',
+                linestyle="None",
+                label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta)
+            )
+            ax.plot(
+                alphas_an[i], 
+                errors_an[i],
                 label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta)
             )
     
