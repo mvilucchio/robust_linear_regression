@@ -5,11 +5,16 @@ import scipy.stats as stats
 from tqdm.auto import tqdm
 import numerical_functions as numfun
 
+def get_cmap(n, name='hsv'):
+    '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct 
+    RGB color; the keyword argument name must be a standard mpl colormap name.'''
+    return plt.cm.get_cmap(name, n)
+
 def state_equations(var_func, var_hat_func, delta = .001, lambd = .01, alpha = .5, init=(.5, .5, 0.5)):
     m, q, sigma = init[0], init[1], init[2]
     err = 1.0
     blend = .7
-    while err > 1e-7:
+    while err > 1e-6:
         m_hat, q_hat, sigma_hat = var_hat_func(m, q, sigma, alpha, delta)
 
         temp_m, temp_q, temp_sigma = m, q, sigma
@@ -37,8 +42,8 @@ def state_equations_max_iters(var_func, var_hat_func, n_max = 1000, delta = .001
 
         err = np.min(np.abs([temp_m - m, temp_q - q, temp_sigma - sigma]))
 
-        m = blend * m + (1 - blend)*temp_m
-        q = blend * q + (1 - blend)*temp_q
+        m = blend * m + (1 - blend) * temp_m
+        q = blend * q + (1 - blend) * temp_q
         sigma = blend * sigma + (1 - blend) * temp_sigma
 
     return m, q, sigma
@@ -84,26 +89,32 @@ def var_hat_func_L2_num(m, q, sigma, alpha, delta):
     sigma_hat = - alpha * numfun.sigma_hat_equation_L2(m, q, sigma, delta)
     return m_hat, q_hat, sigma_hat
 
-# def var_hat_func_L1_num(m, q, sigma, alpha, delta):
-    
-#     return m_hat, q_hat, sigma_hat
+def var_hat_func_L1_num(m, q, sigma, alpha, delta):
+    m_hat = alpha * numfun.m_hat_equation_L1(m, q, sigma, delta)
+    q_hat = alpha * numfun.q_hat_equation_L1(m, q, sigma, delta)
+    sigma_hat = - alpha * numfun.sigma_hat_equation_L1(m, q, sigma, delta)
+    return m_hat, q_hat, sigma_hat
 
-# def var_hat_func_Huber_num(m, q, sigma, alpha, delta):
-
-#     return m_hat, q_hat, sigma_hat
+def var_hat_func_Huber_num(m, q, sigma, alpha, delta):
+    m_hat = alpha * numfun.m_hat_equation_Huber(m, q, sigma, delta)
+    q_hat = alpha * numfun.q_hat_equation_Huber(m, q, sigma, delta)
+    sigma_hat = - alpha * numfun.sigma_hat_equation_Huber(m, q, sigma, delta)
+    return m_hat, q_hat, sigma_hat
 
 if __name__ == "__main__":
     alpha_min, alpha_max = 0.01, 100
-    alpha_points_int = 20
-    alpha_points_an = 50
+    alpha_points_int = 31
+    alpha_points_an = 100
     deltas = [1.0]
-    lambdas = [0.1, 1.0, 10.0]
+    lambdas = [0.01, 0.1, 1.0]
 
     alphas_int = [None] * len(deltas) * len(lambdas)
     errors_int = [None] * len(deltas) * len(lambdas)
 
     alphas_an = [None] * len(deltas) * len(lambdas)
     errors_an = [None] * len(deltas) * len(lambdas)
+
+    colormap = get_cmap(len(lambdas) * len(deltas))
 
     # m = 0.05 * np.random.random() + 0.45
     # q = 0.02 * np.random.random() + 0.01
@@ -124,7 +135,7 @@ if __name__ == "__main__":
 
             alphas_int[i], errors_int[i] = projection_ridge_different_alpha_theory(
                 var_func_L2, 
-                var_hat_func_L2_num, 
+                var_hat_func_L1_num, 
                 alpha_1 = alpha_min, 
                 alpha_2 = alpha_max, 
                 n_alpha_points = alpha_points_int, 
@@ -135,31 +146,31 @@ if __name__ == "__main__":
             )
             # print(initial)
 
-    for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-        for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
-            while True:
-                m = np.random.random()
-                q = np.random.random()
-                sigma = np.random.random()
-                if np.square(m) < q + delta * q:
-                    break
+    # for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
+    #     for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
+    #         while True:
+    #             m = np.random.random()
+    #             q = np.random.random()
+    #             sigma = np.random.random()
+    #             if np.square(m) < q + delta * q:
+    #                 break
 
-            initial = [m, q, sigma]
+    #         initial = [m, q, sigma]
 
-            i = idx * len(deltas) + jdx
+    #         i = idx * len(deltas) + jdx
 
-            alphas_an[i], errors_an[i] = projection_ridge_different_alpha_theory(
-                var_func_L2, 
-                var_hat_func_L2, 
-                alpha_1 = alpha_min, 
-                alpha_2 = alpha_max, 
-                n_alpha_points = alpha_points_an, 
-                lambd = l, 
-                delta = delta,
-                initial_cond = initial,
-                verbose = True
-            )
-            # print(initial)
+    #         alphas_an[i], errors_an[i] = projection_ridge_different_alpha_theory(
+    #             var_func_L2, 
+    #             var_hat_func_L2, 
+    #             alpha_1 = alpha_min, 
+    #             alpha_2 = alpha_max, 
+    #             n_alpha_points = alpha_points_an, 
+    #             lambd = l, 
+    #             delta = delta,
+    #             initial_cond = initial,
+    #             verbose = True
+    #         )
+    #         # print(initial)
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
@@ -171,13 +182,15 @@ if __name__ == "__main__":
                 errors_int[i],
                 marker='.',
                 linestyle="None",
-                label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta)
+                label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
+                color = colormap(i)
             )
-            ax.plot(
-                alphas_an[i], 
-                errors_an[i],
-                label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta)
-            )
+            # ax.plot(
+            #     alphas_an[i], 
+            #     errors_an[i],
+            #     # label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
+            #     color = colormap(i)
+            # )
     
     ax.set_title("L2 Loss")
     ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
@@ -188,6 +201,6 @@ if __name__ == "__main__":
     ax.grid(True, which='both')
     ax.legend()
 
-    fig.savefig("./imgs/{}.png".format(initial), format='png')
+    fig.savefig("./imgs/ok - [{:.3f}, {:.3f}, {:.3f}].png".format(*initial), format='png')
 
     plt.show()

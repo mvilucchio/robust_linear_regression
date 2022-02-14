@@ -21,7 +21,7 @@ reps = 10
 deltas = [1.0]
 lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
-colormap = cmap = get_cmap(len(lambdas) * len(deltas))
+colormap = get_cmap(len(lambdas) * len(deltas))
 
 alphas_num = [None] * len(deltas) * len(lambdas)
 final_errors_mean = [None] * len(deltas) * len(lambdas)

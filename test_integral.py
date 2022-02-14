@@ -24,7 +24,7 @@ if __name__ == "__main__":
     print("m : {:.3f} q : {:.3f} sigma : {:.3f}".format(m, q, sigma))
 
     borders = num.find_integration_borders(
-        lambda y, zeta : num.integral2(y, zeta, q, m, sigma, delta), 
+        lambda y, zeta : num.m_integral_L1(y, zeta, q, m, sigma, delta), 
         0.1, np.sqrt((1 + delta)),
         0.1
     )
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     for i in range(len(X)):
         for j in range(len(X)):
-            Z[i][j] = num.integral2(X[i][j], Y[i][j], q, m, sigma, delta)
+            Z[i][j] = num.m_integral_L1(X[i][j], Y[i][j], q, m, sigma, delta)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')

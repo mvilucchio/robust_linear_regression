@@ -6,7 +6,7 @@ from tqdm.auto import tqdm
 from scipy.integrate import dblquad, quad
 import fixed_point_equations as fpe
 
-MULT_INTEGRAL = 10
+MULT_INTEGRAL = 5
 
 def ZoutBayes(y, omega, V, delta):
     return np.exp(-(y - omega)**2 / ( 2 * (V + delta) ) ) / np.sqrt( 2*np.pi * (V + delta) )
@@ -20,13 +20,29 @@ def foutL2(y, omega, V):
 def DfoutL2(y, omega, V):
     return - 1.0 / (1 + V)
 
-# def foutL1():
-#     return
+@np.vectorize
+def foutL1(y, omega, V):
+    if omega <= y - V:
+        return 1
+    elif omega <= y + V:
+        return (y - omega) / V
+    else:
+        return -1
 
-# def DfoutL1():
-#     return
+@np.vectorize
+def DfoutL1(y, omega, V):
+    if np.abs(omega - y) > V:
+        return 0.0
+    else:
+        return - 1.0 / V
 
-def find_integration_borders(fun, scale1, scale2, mult = MULT_INTEGRAL, tol=1e-8, n_points=300):
+def foutHuber(y, omega, V):
+    return
+
+def DfoutHuber(y, omega, V):
+    return
+
+def find_integration_borders(fun, scale1, scale2, mult = MULT_INTEGRAL, tol=1e-6, n_points=300):
     borders = [[- mult * scale1, mult * scale1], [- mult * scale2, mult * scale2]]
 
     for idx, ax in enumerate(borders):
@@ -54,26 +70,79 @@ def find_integration_borders(fun, scale1, scale2, mult = MULT_INTEGRAL, tol=1e-8
 
     return borders
 
-def integral1(y, xi, q, m, sigma, delta):
+# -----------------
+
+def m_integral_L2(y, xi, q, m, sigma, delta):
     eta = m**2 / q
-    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * foutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * foutL2(y, np.sqrt(q) * xi, sigma)
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        foutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        foutL2(y, np.sqrt(q) * xi, sigma)
 
-def integral2(y, xi, q, m, sigma, delta):
-    eta = m**2 / 2
-    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * foutL2(y, np.sqrt(q) * xi, sigma) * foutL2(y, np.sqrt(q) * xi, sigma)
+def q_integral_L2(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        (foutL2(y, np.sqrt(q) * xi, sigma)**2)
 
-def integral3(y, xi, q, m, sigma, delta):
-    eta = m**2 / 2
-    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * DfoutL2(y, np.sqrt(q) * xi, sigma)
+def sigma_integral_L2(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        DfoutL2(y, np.sqrt(q) * xi, sigma)
+
+# ---
+
+def m_integral_L1(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        foutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        foutL1(y, np.sqrt(q) * xi, sigma)
+
+def q_integral_L1(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        (foutL1(y, np.sqrt(q) * xi, sigma)**2)
+
+def sigma_integral_L1(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        DfoutL1(y, np.sqrt(q) * xi, sigma)
+
+# ---
+
+def m_integral_Huber(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        foutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        foutHuber(y, np.sqrt(q) * xi, sigma)
+
+def q_integral_Huber(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        (foutHuber(y, np.sqrt(q) * xi, sigma)**2)
+
+def sigma_integral_Huber(y, xi, q, m, sigma, delta):
+    eta = m**2 / q
+    return np.exp(- xi**2 / 2) / np.sqrt(2 * np.pi) * \
+        ZoutBayes(y, np.sqrt(eta) * xi, (1 - eta), delta) * \
+        DfoutHuber(y, np.sqrt(q) * xi, sigma)
+
+# -------------------
 
 def m_hat_equation_L2(m, q, sigma, delta):
     borders = find_integration_borders(
-        lambda y, xi : integral1(y, xi, q, m, sigma, delta), 
+        lambda y, xi : m_integral_L2(y, xi, q, m, sigma, delta), 
         np.sqrt((1 + delta)),
         1.0
     )
     return dblquad(
-        lambda y, xi: integral1(y, xi, q, m, sigma, delta), 
+        lambda y, xi: m_integral_L2(y, xi, q, m, sigma, delta), 
         borders[0][0], 
         borders[0][1], 
         borders[1][0],
@@ -82,12 +151,12 @@ def m_hat_equation_L2(m, q, sigma, delta):
 
 def q_hat_equation_L2(m, q, sigma, delta):
     borders = find_integration_borders(
-        lambda y, xi : integral2(y, xi, q, m, sigma, delta), 
+        lambda y, xi : q_integral_L2(y, xi, q, m, sigma, delta), 
         np.sqrt((1 + delta)),
         1.0
     )
     return dblquad(
-        lambda y, xi: integral2(y, xi, q, m, sigma, delta), 
+        lambda y, xi: q_integral_L2(y, xi, q, m, sigma, delta), 
         borders[0][0], 
         borders[0][1], 
         borders[1][0],
@@ -96,17 +165,73 @@ def q_hat_equation_L2(m, q, sigma, delta):
 
 def sigma_hat_equation_L2(m, q, sigma, delta):
     borders = find_integration_borders(
-        lambda y, xi : integral3(y, xi, q, m, sigma, delta), 
+        lambda y, xi : sigma_integral_L2(y, xi, q, m, sigma, delta), 
         np.sqrt((1 + delta)),
         1.0
     )
     return dblquad(
-        lambda y, xi: integral3(y, xi, q, m, sigma, delta), 
+        lambda y, xi: sigma_integral_L2(y, xi, q, m, sigma, delta), 
         borders[0][0], 
         borders[0][1], 
         borders[1][0],
         borders[1][1]
     )[0]
+
+def m_hat_equation_L1(m, q, sigma, delta):
+    borders = find_integration_borders(
+        lambda y, xi : m_integral_L1(y, xi, q, m, sigma, delta), 
+        np.sqrt((1 + delta)),
+        1.0
+    )
+    return dblquad(
+        lambda y, xi: m_integral_L1(y, xi, q, m, sigma, delta), 
+        borders[0][0], 
+        borders[0][1], 
+        borders[1][0],
+        borders[1][1]
+    )[0]
+
+def q_hat_equation_L1(m, q, sigma, delta):
+    borders = find_integration_borders(
+        lambda y, xi : q_integral_L1(y, xi, q, m, sigma, delta), 
+        np.sqrt((1 + delta)),
+        1.0
+    )
+    return dblquad(
+        lambda y, xi: q_integral_L1(y, xi, q, m, sigma, delta), 
+        borders[0][0], 
+        borders[0][1], 
+        borders[1][0],
+        borders[1][1] # lambda xi: np.sqrt(eta) * xi - size_y, lambda xi: np.sqrt(eta) * xi + size_y
+    )[0]
+
+def sigma_hat_equation_L1(m, q, sigma, delta):
+    borders = find_integration_borders(
+        lambda y, xi : sigma_integral_L1(y, xi, q, m, sigma, delta), 
+        np.sqrt((1 + delta)),
+        1.0
+    )
+    return dblquad(
+        lambda y, xi: sigma_integral_L1(y, xi, q, m, sigma, delta), 
+        borders[0][0], 
+        borders[0][1], 
+        borders[1][0],
+        borders[1][1]
+    )[0]
+
+def m_hat_equation_Huber(m, q, sigma, delta):
+
+    return 0.0
+
+def q_hat_equation_Huber(m, q, sigma, delta):
+
+    return 0.0
+
+def sigma_hat_equation_Huber(m, q, sigma, delta):
+
+    return 0.0
+
+# ---------------------------
 
 def state_equations_convergence(var_func, var_hat_func, delta = 0.1, lamb = 0.1, alpha = 0.5, init=(.5, .4, 1), verbose=False):
     m, q, sigma = init[0], init[1], init[2]
