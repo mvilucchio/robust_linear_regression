@@ -49,7 +49,7 @@ class GaussianPrior(Prior):
     def Dfw(self, gamma, Lambda):
         return 
 
-class SquareLoss(Channel):
+class L2Loss(Channel):
     name = "L2 loss"
     tex_string = r"$L(y,z) = \frac{1}{2} (y - z)^2 + \frac{lambda}{2} w^2$"
 

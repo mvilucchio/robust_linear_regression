@@ -5,7 +5,8 @@ import scipy.stats as stats
 import numerical_functions as numfun
 from tqdm.auto import tqdm
 
-class DataGenerator():
+
+class DataGenerator:
     def __init__():
         pass
 
@@ -18,12 +19,13 @@ class DataGenerator():
     def generate_test_training_set(self, d, n):
         pass
 
+
 class DataGenerationSingleNoise(DataGenerator):
     def __init__(self):
         return
 
     def noise_fun(self, n_samples, delta):
-        return 
+        return
 
     def generate_data(self, n_samples, d, teacher_weights):
         return
@@ -31,12 +33,13 @@ class DataGenerationSingleNoise(DataGenerator):
     def generate_test_training_set(self, d, n):
         return
 
+
 class DataGenerationDoubleNoise(DataGenerator):
     def __init__(self):
         return
 
     def noise_fun(self, n_samples, delta):
-        return 
+        return
 
     def generate_data(self, n_samples, d, teacher_weights):
         return
