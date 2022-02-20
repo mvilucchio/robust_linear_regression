@@ -1,3 +1,4 @@
+from cProfile import label
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
@@ -6,57 +7,34 @@ from tqdm.auto import tqdm
 import fixed_point_equations as fpe
 from mpl_toolkits.mplot3d import Axes3D
 import numerical_functions as num
+from scipy.integrate import dblquad
 from matplotlib import cm
 
 
 if __name__ == "__main__":
-    delta = 0.1
+    delta = 1.0
 
-    m, q, sigma = 0.0, 0.0, 0.0
+    m, q, sigma, a, alpha = 0.9, 3, -1.1, 1, 1
 
-    while True:
-        m = np.random.random()
-        q = np.random.random()
-        sigma = np.random.random()
-        if np.square(m) < q + delta * q:
-            break
+    borders = [[-10, 10], [-10, 10]]
 
-    print("m : {:.3f} q : {:.3f} sigma : {:.3f}".format(m, q, sigma))
+    if sigma + 1 >= 0:
+        print("sigma + 1 >= 0 integral : {:.9f}".format(
+            num.integral_fpe(num.m_integral_Huber,
+                             num.border_plus, num.border_minus, num.test_fun_upper, m, q, sigma, delta)
+        ))
+    else:
+        print("sigma + 1 < 0 integral : {:.9f}".format(
+            num.integral_fpe(num.m_integral_Huber,
+                             num.border_minus, num.border_plus, num.test_fun_down, m, q, sigma, delta)
+        ))
 
-    borders = num.find_integration_borders(
-        lambda y, zeta : num.m_integral_L1(y, zeta, q, m, sigma, delta), 
-        0.1, np.sqrt((1 + delta)),
-        0.1
-    )
+    xi = np.linspace(-8, 8, 100)
 
-    print("border : [{:.3f}, {:.3f}] border 2 : [{:.3f}, {:.3f}]".format(borders[0][0], borders[0][1], borders[1][0], borders[1][1]))
+    plt.plot(xi, num.border_plus(xi, m, q, sigma, delta), label="plus")
+    plt.plot(xi, num.border_minus(xi, m, q, sigma, delta), label="minus")
 
-    X = np.linspace(borders[0][0], borders[0][1], 500) # y
-    Y = np.linspace(borders[1][0], borders[1][1], 500) # zeta
-    X, Y = np.meshgrid(X, Y)
-    
-    Z = np.empty(shape=(len(X), len(X)))
-
-    for i in range(len(X)):
-        for j in range(len(X)):
-            Z[i][j] = num.m_integral_L1(X[i][j], Y[i][j], q, m, sigma, delta)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-
-    ax.set_xlabel('y')
-    ax.set_ylabel('zeta')
-    # ax.set_zlabel(r'$\Sigma_{final}$')
-
-    # ax.set_title("FP Stability")
-    # ax.set_ylabel(r"")
-    # ax.set_xlabel(r"$\Sigma_{init}$")
-    # ax.set_xscale('log')
-    # ax.set_yscale('log')
-    ax.minorticks_on()
-    ax.grid(True, which='both')
-    # ax.legend()
-    
+    plt.ylim([-7.0710678118654755, 7.0710678118654755])
+    plt.xlim([-7.0710678118654755, 7.0710678118654755])
+    plt.legend()
     plt.show()

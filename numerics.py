@@ -4,16 +4,26 @@ from scipy.stats import norm
 import scipy.stats as stats
 from tqdm.auto import tqdm
 
+
 def noise_gen(n_samples=1000, delta=1):
-    error_sample = np.sqrt(delta) * np.random.normal(loc=0.0, scale=1.0, size=(n_samples,))
+    error_sample = np.sqrt(delta) * np.random.normal(
+        loc=0.0, scale=1.0, size=(n_samples,)
+    )
     return error_sample
 
+
+def noise_gen_double(n_samples=1000, delta_small=1, delta_large=10, eps=0.1):
+    choice = np.random.choice([0, 1], p=[1 - eps, eps], size=(n_samples,))
+    error_sample = np.empty((n_samples, 2))
+    error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(loc=0.0, scale=1.0, size=(n_samples,))
+    error_sample[:, 1] = np.sqrt(delta_large) * np.random.normal(loc=0.0, scale=1.0, size=(n_samples,))
+    total_error = np.where(choice, error_sample[:, 1], error_sample[:, 0])
+    return total_error
+
+
 def data_generation_single_noise(
-        n_features=100, 
-        n_samples=1000, 
-        n_generalization=200, 
-        delta=1
-    ):
+    n_features=100, n_samples=1000, n_generalization=200, delta=1
+):
     theta_0_teacher = np.random.normal(loc=0.0, scale=1.0, size=(n_features,))
 
     # training data
@@ -24,23 +34,56 @@ def data_generation_single_noise(
     xs_gen = np.random.normal(loc=0.0, scale=1.0, size=(n_generalization, n_features))
     # total_error_gen = noise_gen(n_samples=n_generalization, delta=delta)
 
-    ys = np.divide( xs @ theta_0_teacher, np.sqrt(n_features) ) + total_error
-    ys_gen = np.divide( xs_gen @ theta_0_teacher, np.sqrt(n_features) ) # + total_error_gen # should not be here
+    ys = np.divide(xs @ theta_0_teacher, np.sqrt(n_features)) + total_error
+    ys_gen = np.divide(
+        xs_gen @ theta_0_teacher, np.sqrt(n_features)
+    )  # + total_error_gen # should not be here
 
     return xs, ys, xs_gen, ys_gen, theta_0_teacher
 
+
+def data_generation_double_noise(
+    n_features=100,
+    n_samples=1000,
+    n_generalization=200,
+    delta_small=1.0,
+    delta_large=10.0,
+    eps=0.1,
+):
+    theta_0_teacher = np.random.normal(loc=0.0, scale=1.0, size=(n_features,))
+
+    # training data
+    xs = np.random.normal(loc=0.0, scale=1.0, size=(n_samples, n_features))
+    total_error = noise_gen_double(
+        n_samples=n_samples, delta_small=delta_small, delta_large=delta_large, eps=eps
+    )
+
+    # generalizzation data
+    xs_gen = np.random.normal(loc=0.0, scale=1.0, size=(n_generalization, n_features))
+    # total_error_gen = noise_gen(n_samples=n_generalization, delta=delta)
+
+    ys = np.divide(xs @ theta_0_teacher, np.sqrt(n_features)) + total_error
+    ys_gen = np.divide(
+        xs_gen @ theta_0_teacher, np.sqrt(n_features)
+    )  # + total_error_gen # should not be here
+
+    return xs, ys, xs_gen, ys_gen, theta_0_teacher
+
+
 def generate_different_alpha(
-        find_coefficients_fun, 
-        delta = 1.0, 
-        alpha_1 = 1, 
-        alpha_2 = 1000, 
-        n_features = 100, 
-        n_alpha_points = 16, 
-        repetitions = 10, 
-        lambda_reg = 1.0
-    ):
-    
-    alphas = np.logspace(np.log(alpha_1)/np.log(10), np.log(alpha_2)/np.log(10), n_alpha_points)
+    find_coefficients_fun,
+    delta=1.0,
+    alpha_1=1,
+    alpha_2=1000,
+    n_features=100,
+    n_alpha_points=16,
+    repetitions=10,
+    lambda_reg=1.0,
+):
+
+    alphas = np.logspace(
+        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
+    )
 
     final_errors_mean = np.empty((n_alpha_points,))
     final_errors_std = np.empty((n_alpha_points,))
@@ -50,19 +93,16 @@ def generate_different_alpha(
 
         for idx in range(repetitions):
             xs, ys, _, _, ground_truth_theta = data_generation_single_noise(
-                n_features = n_features, 
-                n_samples = max(int(np.around(n_features * alpha)), 1),
-                n_generalization = 1,
-                delta = delta
+                n_features=n_features,
+                n_samples=max(int(np.around(n_features * alpha)), 1),
+                n_generalization=1,
+                delta=delta,
             )
 
-            estimated_theta = find_coefficients_fun(ys, xs, l = lambda_reg)
-            
+            estimated_theta = find_coefficients_fun(ys, xs, l=lambda_reg)
+
             all_gen_errors[idx] = np.divide(
-                np.sum(np.square(
-                    ground_truth_theta - estimated_theta
-                )),
-                n_features
+                np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
             )
 
             del xs
@@ -76,22 +116,76 @@ def generate_different_alpha(
 
     return alphas, final_errors_mean, final_errors_std
 
-def find_coefficients_ridge(ys, xs, l = 1.0):
+
+def generate_different_alpha_double_noise(
+    find_coefficients_fun,
+    delta_small=1.0,
+    delta_large=10.0,
+    alpha_1=1,
+    alpha_2=1000,
+    n_features=100,
+    n_alpha_points=16,
+    repetitions=10,
+    lambda_reg=1.0,
+    eps=0.1,
+):
+
+    alphas = np.logspace(
+        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
+    )
+
+    final_errors_mean = np.empty((n_alpha_points,))
+    final_errors_std = np.empty((n_alpha_points,))
+
+    for jdx, alpha in enumerate(alphas):
+        all_gen_errors = np.empty((repetitions,))
+
+        for idx in range(repetitions):
+            xs, ys, _, _, ground_truth_theta = data_generation_double_noise(
+                n_features=n_features,
+                n_samples=max(int(np.around(n_features * alpha)), 1),
+                n_generalization=1,
+                delta_small=delta_small,
+                delta_large=delta_large,
+                eps=eps,
+            )
+
+            estimated_theta = find_coefficients_fun(ys, xs, l=lambda_reg)
+
+            all_gen_errors[idx] = np.divide(
+                np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
+            )
+
+            del xs
+            del ys
+            del ground_truth_theta
+
+        final_errors_mean[jdx] = np.mean(all_gen_errors)
+        final_errors_std[jdx] = np.std(all_gen_errors)
+
+        del all_gen_errors
+
+    return alphas, final_errors_mean, final_errors_std
+
+
+def find_coefficients_ridge(ys, xs, l=1.0):
     n, d = xs.shape
     a = np.divide(xs.T.dot(xs), d) + l * np.identity(d)
     b = np.divide(xs.T.dot(ys), np.sqrt(d))
     return np.linalg.solve(a, b)
 
-def find_coefficients_L1(ys, xs, l = 1.0, n_max = 10000, learning_rate = 0.001):
+
+def find_coefficients_L1(ys, xs, l=1.0, n_max=10000, learning_rate=0.001):
     n, d = xs.shape
     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
     xs_norm = np.divide(xs, np.sqrt(d))
     for _ in range(n_max):
-        grad = - np.sign(ys - xs_norm @ w) @ (xs_norm) + l * w
+        grad = -np.sign(ys - xs_norm @ w) @ (xs_norm) + l * w
         w -= learning_rate * grad
     return w
 
-def find_coefficients_Huber(ys, xs, l = 1.0, n_max = 150, learning_rate = 0.01):
+
+def find_coefficients_Huber(ys, xs, l=1.0, n_max=150, learning_rate=0.01):
     n, d = xs.shape
     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
     xs_norm = np.divide(xs, np.sqrt(d))
@@ -100,13 +194,15 @@ def find_coefficients_Huber(ys, xs, l = 1.0, n_max = 150, learning_rate = 0.01):
         w -= learning_rate * grad
     return w
 
+
 if __name__ == "__main__":
-    loss = "L1"
+    loss = "L2"
     alpha_min, alpha_max = 0.01, 100
+    epsil = 0.1
     alpha_points = 21
     d = 400
     reps = 10
-    deltas = [1.0]
+    deltas = [[1.0, 10.0]]
     lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
     alphas = [None] * len(deltas) * len(lambdas)
@@ -114,38 +210,57 @@ if __name__ == "__main__":
     final_errors_std = [None] * len(deltas) * len(lambdas)
 
     for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-        for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
-            i = idx * len(deltas) +  jdx
+        for jdx, (d_small, d_large) in enumerate(
+            tqdm(deltas, desc="delta", leave=False)
+        ):
+            i = idx * len(deltas) + jdx
 
             if loss == "L2":
-                alphas[i], final_errors_mean[i], final_errors_std[i] = generate_different_alpha(
-                    find_coefficients_ridge, 
-                    delta = delta, 
-                    alpha_1 = alpha_min, alpha_2 = alpha_max, 
-                    n_features = d, 
-                    n_alpha_points = alpha_points, 
-                    repetitions = reps, 
-                    lambda_reg = l
+                (
+                    alphas[i],
+                    final_errors_mean[i],
+                    final_errors_std[i],
+                ) = generate_different_alpha_double_noise(
+                    find_coefficients_ridge,
+                    delta_small=d_small,
+                    delta_large=d_large,
+                    alpha_1=alpha_min,
+                    alpha_2=alpha_max,
+                    n_features=d,
+                    n_alpha_points=alpha_points,
+                    repetitions=reps,
+                    lambda_reg=l,
+                    eps=epsil,
                 )
             elif loss == "L1":
-                alphas[i], final_errors_mean[i], final_errors_std[i] = generate_different_alpha(
-                    find_coefficients_L1, 
-                    delta = delta, 
-                    alpha_1 = alpha_min, alpha_2 = alpha_max, 
-                    n_features = d, 
-                    n_alpha_points = alpha_points, 
-                    repetitions = reps, 
-                    lambda_reg = l
+                (
+                    alphas[i],
+                    final_errors_mean[i],
+                    final_errors_std[i],
+                ) = generate_different_alpha(
+                    find_coefficients_L1,
+                    delta=delta,
+                    alpha_1=alpha_min,
+                    alpha_2=alpha_max,
+                    n_features=d,
+                    n_alpha_points=alpha_points,
+                    repetitions=reps,
+                    lambda_reg=l,
                 )
             elif loss == "Huber":
-                alphas[i], final_errors_mean[i], final_errors_std[i] = generate_different_alpha(
-                    find_coefficients_L1, 
-                    delta = delta, 
-                    alpha_1 = alpha_min, alpha_2 = alpha_max, 
-                    n_features = d, 
-                    n_alpha_points = alpha_points, 
-                    repetitions = reps, 
-                    lambda_reg = l
+                (
+                    alphas[i],
+                    final_errors_mean[i],
+                    final_errors_std[i],
+                ) = generate_different_alpha(
+                    find_coefficients_L1,
+                    delta=delta,
+                    alpha_1=alpha_min,
+                    alpha_2=alpha_max,
+                    n_features=d,
+                    n_alpha_points=alpha_points,
+                    repetitions=reps,
+                    lambda_reg=l,
                 )
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
@@ -157,20 +272,20 @@ if __name__ == "__main__":
                 alphas[i],
                 final_errors_mean[i],
                 final_errors_std[i],
-                marker='.',
-                linestyle='solid',
-                label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta)
+                marker=".",
+                linestyle="solid",
+                label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
             )
-    
+
     ax.set_title("{} Loss Numerical".format(loss))
     ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
     ax.set_xlabel(r"$\alpha$")
-    ax.set_xscale('log')
-    ax.set_yscale('log')
+    ax.set_xscale("log")
+    ax.set_yscale("log")
     ax.minorticks_on()
-    ax.grid(True, which='both')
+    ax.grid(True, which="both")
     ax.legend()
 
-    fig.savefig("./imgs/L1_exp_n_10000_lr_1e-3.png", format='png')
+    fig.savefig("./imgs/L2_exp_n_10000_lr_1e-3.png", format="png")
 
     plt.show()
