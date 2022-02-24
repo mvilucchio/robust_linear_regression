@@ -112,11 +112,12 @@ def var_hat_func_Huber_num(m, q, sigma, alpha, delta):
     return m_hat, q_hat, sigma_hat
 
 
-def var_hat_func_L2_num_eps(m, q, sigma, alpha, delta):
-    m_hat = alpha * numfuneps.m_hat_equation_L2_eps(m, q, sigma, delta)
-    q_hat = alpha * numfuneps.q_hat_equation_L2_eps(m, q, sigma, delta)
-    sigma_hat = -alpha * numfuneps.sigma_hat_equation_L2_eps(m, q, sigma, delta)
+def var_hat_func_L2_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps=0.1):
+    m_hat = alpha * numfuneps.m_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps)
+    q_hat = alpha * numfuneps.q_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps)
+    sigma_hat = -alpha * numfuneps.sigma_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps)
     return m_hat, q_hat, sigma_hat
+
 
 if __name__ == "__main__":
     alpha_min, alpha_max = 0.01, 100
@@ -153,7 +154,7 @@ if __name__ == "__main__":
 
             alphas_int[i], errors_int[i] = projection_ridge_different_alpha_theory(
                 var_func_L2,
-                var_hat_func_Huber_num,
+                var_hat_func_L2_num,
                 alpha_1=alpha_min,
                 alpha_2=alpha_max,
                 n_alpha_points=alpha_points_int,

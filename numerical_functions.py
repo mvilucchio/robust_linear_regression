@@ -1,4 +1,4 @@
-from cv2 import integral
+# from cv2 import integral
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sc
@@ -30,7 +30,6 @@ def foutL2(y, omega, V):
 @nb.njit(error_model="numpy", fastmath=True)
 def DfoutL2(y, omega, V):
     return -1.0 / (1 + V)
-
 
 
 @nb.njit(error_model="numpy", fastmath=True)
@@ -66,9 +65,7 @@ def DfoutHuber(y, omega, V, a=A_HUBER):
         return - 1.0 / (1 + V)
 
 
-def find_integration_borders(
-    fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, n_points=300
-):
+def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, n_points=300):
     borders = [[-mult * scale1, mult * scale1],
                [-mult * scale2, mult * scale2]]
 

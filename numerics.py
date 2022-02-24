@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import norm
-import scipy.stats as stats
+from scipy import optimize
+from sklearn.utils import axis0_safe_slice
+from sklearn.utils.extmath import safe_sparse_dot
 from tqdm.auto import tqdm
-
+import numba as nb
 
 def noise_gen(n_samples=1000, delta=1):
     error_sample = np.sqrt(delta) * np.random.normal(
@@ -63,9 +64,7 @@ def data_generation_double_noise(
     # total_error_gen = noise_gen(n_samples=n_generalization, delta=delta)
 
     ys = np.divide(xs @ theta_0_teacher, np.sqrt(n_features)) + total_error
-    ys_gen = np.divide(
-        xs_gen @ theta_0_teacher, np.sqrt(n_features)
-    )  # + total_error_gen # should not be here
+    ys_gen = np.divide(xs_gen @ theta_0_teacher, np.sqrt(n_features)) # + total_error_gen # should not be here
 
     return xs, ys, xs_gen, ys_gen, theta_0_teacher
 
@@ -88,10 +87,10 @@ def generate_different_alpha(
     final_errors_mean = np.empty((n_alpha_points,))
     final_errors_std = np.empty((n_alpha_points,))
 
-    for jdx, alpha in enumerate(alphas):
+    for jdx, alpha in enumerate(tqdm(alphas, desc="alpha", leave=False)):
         all_gen_errors = np.empty((repetitions,))
 
-        for idx in range(repetitions):
+        for idx in tqdm(range(repetitions), desc="reps", leave=False):
             xs, ys, _, _, ground_truth_theta = data_generation_single_noise(
                 n_features=n_features,
                 n_samples=max(int(np.around(n_features * alpha)), 1),
@@ -99,7 +98,7 @@ def generate_different_alpha(
                 delta=delta,
             )
 
-            estimated_theta = find_coefficients_fun(ys, xs, l=lambda_reg)
+            estimated_theta = find_coefficients_fun(ys, xs, reg_param=lambda_reg)
 
             all_gen_errors[idx] = np.divide(
                 np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
@@ -121,10 +120,10 @@ def generate_different_alpha_double_noise(
     find_coefficients_fun,
     delta_small=1.0,
     delta_large=10.0,
-    alpha_1=1,
-    alpha_2=1000,
+    alpha_1=0.01,
+    alpha_2=100,
     n_features=100,
-    n_alpha_points=16,
+    n_alpha_points=10,
     repetitions=10,
     lambda_reg=1.0,
     eps=0.1,
@@ -140,17 +139,17 @@ def generate_different_alpha_double_noise(
     for jdx, alpha in enumerate(alphas):
         all_gen_errors = np.empty((repetitions,))
 
-        for idx in range(repetitions):
+        for idx in tqdm(range(repetitions), desc="reps", leave=False):
             xs, ys, _, _, ground_truth_theta = data_generation_double_noise(
                 n_features=n_features,
                 n_samples=max(int(np.around(n_features * alpha)), 1),
                 n_generalization=1,
                 delta_small=delta_small,
                 delta_large=delta_large,
-                eps=eps,
+                eps=eps
             )
 
-            estimated_theta = find_coefficients_fun(ys, xs, l=lambda_reg)
+            estimated_theta = find_coefficients_fun(ys, xs, reg_param=lambda_reg)
 
             all_gen_errors[idx] = np.divide(
                 np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
@@ -168,42 +167,125 @@ def generate_different_alpha_double_noise(
     return alphas, final_errors_mean, final_errors_std
 
 
+@nb.njit(error_model="numpy", fastmath=True)
 def find_coefficients_ridge(ys, xs, l=1.0):
     n, d = xs.shape
     a = np.divide(xs.T.dot(xs), d) + l * np.identity(d)
     b = np.divide(xs.T.dot(ys), np.sqrt(d))
     return np.linalg.solve(a, b)
 
+# @nb.njit(error_model="numpy", fastmath=True)
+def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
+    linear_loss = ys - xs_norm @ w
 
-def find_coefficients_L1(ys, xs, l=1.0, n_max=10000, learning_rate=0.001):
+    loss = np.sum(np.abs(linear_loss)) + 0.5 * reg_param * np.dot(w, w)
+
+    sign_sample = np.ones_like(linear_loss)
+    sign_sample_mask = linear_loss < 0
+    zero_sample_mask = linear_loss == 0
+    sign_sample[sign_sample_mask] = -1.0
+    sign_sample[zero_sample_mask] = 0.0
+
+    gradient = - safe_sparse_dot(sign_sample, xs_norm)
+    gradient += reg_param * w
+
+    return loss, gradient
+
+
+def find_coefficients_L1(ys, xs, reg_param=1.0, max_iter=15000, tol=1e-6):
     n, d = xs.shape
     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
     xs_norm = np.divide(xs, np.sqrt(d))
-    for _ in range(n_max):
-        grad = -np.sign(ys - xs_norm @ w) @ (xs_norm) + l * w
-        w -= learning_rate * grad
-    return w
+
+    bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
+    bounds[-1][0] = np.finfo(np.float64).eps * 10
+
+    opt_res = optimize.minimize(
+        _loss_and_gradient_L1,
+        w,
+        method="L-BFGS-B",
+        jac=True,
+        args=(xs_norm, ys, reg_param),
+        options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
+        bounds=bounds,
+    )
+
+    if opt_res.status == 2:
+        raise ValueError(
+            "L1Regressor convergence failed: l-BFGS-b solver terminated with %s"
+            % opt_res.message
+        )
+
+    return opt_res.x
 
 
-def find_coefficients_Huber(ys, xs, l=1.0, n_max=150, learning_rate=0.01):
+# @nb.njit(error_model="numpy", fastmath=True)
+def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
+    linear_loss = ys - xs_norm @ w
+    abs_linear_loss = np.abs(linear_loss)
+    outliers_mask = abs_linear_loss > a
+
+    outliers = abs_linear_loss[outliers_mask]
+    num_outliers = np.count_nonzero(outliers_mask)
+    n_non_outliers = xs_norm.shape[0] - num_outliers
+
+    loss = a * np.sum(outliers) - 0.5 * num_outliers * a ** 2
+
+    non_outliers = linear_loss[~outliers_mask]
+    loss += 0.5 * np.dot(non_outliers, non_outliers)
+    loss += 0.5 * reg_param * np.dot(w, w)
+
+    xs_non_outliers = -axis0_safe_slice(xs_norm, ~outliers_mask, n_non_outliers)
+    gradient = safe_sparse_dot(non_outliers, xs_non_outliers)
+    
+    signed_outliers = np.ones_like(outliers)
+    signed_outliers_mask = linear_loss[outliers_mask] < 0
+    signed_outliers[signed_outliers_mask] = -1.0
+
+    xs_outliers = axis0_safe_slice(xs_norm, outliers_mask, num_outliers)
+
+    gradient -= a * safe_sparse_dot(signed_outliers, xs_outliers)
+    gradient += reg_param * w
+
+    return loss, gradient
+
+def find_coefficients_Huber(ys, xs, reg_param=1.0, max_iter=15000, tol=1e-6, a=1.0):
     n, d = xs.shape
     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
     xs_norm = np.divide(xs, np.sqrt(d))
-    for _ in range(n_max):
-        grad = 0.0
-        w -= learning_rate * grad
-    return w
 
+    bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
+    bounds[-1][0] = np.finfo(np.float64).eps * 10
+
+    opt_res = optimize.minimize(
+        _loss_and_gradient_huber,
+        w,
+        method="L-BFGS-B",
+        jac=True,
+        args=(xs_norm, ys, reg_param, a),
+        options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
+        bounds=bounds,
+    )
+
+    if opt_res.status == 2:
+        raise ValueError(
+            "HuberRegressor convergence failed: l-BFGS-b solver terminated with %s"
+            % opt_res.message
+        )
+
+    return opt_res.x
 
 if __name__ == "__main__":
-    loss = "L2"
+    random_number = np.random.randint(0, 100)
+
+    loss = "L1"
     alpha_min, alpha_max = 0.01, 100
     epsil = 0.1
-    alpha_points = 21
+    alpha_points = 17
     d = 400
-    reps = 10
-    deltas = [[1.0, 10.0]]
-    lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
+    reps = 6
+    deltas = [[0.1, 1.0], [1.0, 10.0], [10.0, 100.0]]
+    lambdas = [0.01, 0.1]
 
     alphas = [None] * len(deltas) * len(lambdas)
     final_errors_mean = [None] * len(deltas) * len(lambdas)
@@ -239,7 +321,7 @@ if __name__ == "__main__":
                     final_errors_std[i],
                 ) = generate_different_alpha(
                     find_coefficients_L1,
-                    delta=delta,
+                    delta=d_small,
                     alpha_1=alpha_min,
                     alpha_2=alpha_max,
                     n_features=d,
@@ -253,8 +335,8 @@ if __name__ == "__main__":
                     final_errors_mean[i],
                     final_errors_std[i],
                 ) = generate_different_alpha(
-                    find_coefficients_L1,
-                    delta=delta,
+                    find_coefficients_Huber,
+                    delta=d_small,
                     alpha_1=alpha_min,
                     alpha_2=alpha_max,
                     n_features=d,
@@ -286,6 +368,6 @@ if __name__ == "__main__":
     ax.grid(True, which="both")
     ax.legend()
 
-    fig.savefig("./imgs/L2_exp_n_10000_lr_1e-3.png", format="png")
+    fig.savefig("./imgs/L2_exp_n_10000_lr_1e-3 - {}.png".format(random_number), format="png")
 
     plt.show()
