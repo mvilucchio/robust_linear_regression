@@ -67,7 +67,7 @@ if __name__ == "__main__":
     eps = 0.1
     alpha_points = 21
     deltas = [[1.0, 2.0], [1.0, 5.0], [1.0, 10.0]]
-    lambdas = [100.0] #0.01, 0.1, 1.0, 10.0, 
+    lambdas = [0.01] #0.01, 0.1, 1.0, 10.0, 100.0
 
     alphas = [None] * len(deltas) * len(lambdas)
     errors = [None] * len(deltas) * len(lambdas)
