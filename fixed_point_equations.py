@@ -66,6 +66,18 @@ def projection_ridge_different_alpha_theory(
     return alphas, error_theory
 
 
+def var_func_BO(m_hat, q_hat, sigma_hat, alpha, delta, lambd):
+    q = q_hat / (1 + q_hat)
+    return q, q, 1 - q
+
+def var_hat_func_BO(m, q, sigma, alpha, delta):
+    q_hat = alpha / (1 + delta - q)
+    return q_hat, q_hat, q_hat
+
+def var_hat_func_BO_num(m, q, sigma, alpha, delta):
+    q_hat = alpha * numfun.q_hat_equation_BO(m, q, sigma, delta)
+    return q_hat, q_hat, q_hat
+
 def var_func_L2(m_hat, q_hat, sigma_hat, alpha, delta, lambd):
     m = m_hat / (sigma_hat + lambd)
     q = (np.square(m_hat) + q_hat) / np.square(sigma_hat + lambd)

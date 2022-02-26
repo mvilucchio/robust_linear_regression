@@ -10,6 +10,7 @@ import numba as nb
 MULT_INTEGRAL = 5
 A_HUBER = 1.0
 
+
 @nb.njit(error_model="numpy", fastmath=True)
 def ZoutBayes(y, omega, V, delta):
     return np.exp(-((y - omega) ** 2) / (2 * (V + delta))) / np.sqrt(
@@ -62,12 +63,13 @@ def DfoutHuber(y, omega, V, a=A_HUBER):
     if (y < omega and a + a * V + y < omega) or (a + a * V + omega < y):
         return 0.0
     else:
-        return - 1.0 / (1 + V)
+        return -1.0 / (1 + V)
 
 
-def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, n_points=300):
-    borders = [[-mult * scale1, mult * scale1],
-               [-mult * scale2, mult * scale2]]
+def find_integration_borders(
+    fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, n_points=300
+):
+    borders = [[-mult * scale1, mult * scale1], [-mult * scale2, mult * scale2]]
 
     for idx, ax in enumerate(borders):
         for jdx, border in enumerate(ax):
@@ -80,7 +82,7 @@ def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, 
                             for pt in np.linspace(
                                 borders[1 if idx == 0 else 0][0],
                                 borders[1 if idx == 0 else 0][1],
-                                n_points
+                                n_points,
                             )
                         ]
                     )
@@ -91,7 +93,7 @@ def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, 
                             for pt in np.linspace(
                                 borders[1 if idx == 0 else 0][0],
                                 borders[1 if idx == 0 else 0][1],
-                                n_points
+                                n_points,
                             )
                         ]
                     )
@@ -111,6 +113,18 @@ def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, 
     borders = [[-max_val, max_val], [-max_val, max_val]]
 
     return borders
+
+
+# -----------------
+@nb.njit(error_model="numpy", fastmath=True)
+def q_integral_BO(y, xi, q, m, sigma, delta):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes(y, np.sqrt(q) * xi, 1 - q, delta)
+        * (foutBayes(y, np.sqrt(q) * xi, 1 - q, delta) ** 2)
+    )
 
 
 # -----------------
@@ -225,11 +239,23 @@ def sigma_integral_Huber(y, xi, q, m, sigma, delta):
 # -------------------
 
 
+def q_hat_equation_BO(m, q, sigma, delta):
+    borders = find_integration_borders(
+        lambda y, xi: q_integral_BO(y, xi, q, m, sigma, delta), np.sqrt((1 + delta)), 1.0,
+    )
+    return dblquad(
+        q_integral_BO,
+        borders[0][0],
+        borders[0][1],
+        borders[1][0],
+        borders[1][1],
+        args=(q, m, sigma, delta),
+    )[0]
+
+
 def m_hat_equation_L2(m, q, sigma, delta):
     borders = find_integration_borders(
-        lambda y, xi: m_integral_L2(y, xi, q, m, sigma, delta),
-        np.sqrt((1 + delta)),
-        1.0,
+        lambda y, xi: m_integral_L2(y, xi, q, m, sigma, delta), np.sqrt((1 + delta)), 1.0,
     )
     return dblquad(
         m_integral_L2,
@@ -243,9 +269,7 @@ def m_hat_equation_L2(m, q, sigma, delta):
 
 def q_hat_equation_L2(m, q, sigma, delta):
     borders = find_integration_borders(
-        lambda y, xi: q_integral_L2(y, xi, q, m, sigma, delta),
-        np.sqrt((1 + delta)),
-        1.0,
+        lambda y, xi: q_integral_L2(y, xi, q, m, sigma, delta), np.sqrt((1 + delta)), 1.0,
     )
     return dblquad(
         q_integral_L2,
@@ -292,18 +316,18 @@ def border_minus(xi, m, q, sigma, delta, a=A_HUBER):
 
 
 def test_fun_upper(y, m, q, sigma, delta, a=A_HUBER):
-    return a / np.sqrt(q) * (- (sigma + 1) + y)
+    return a / np.sqrt(q) * (-(sigma + 1) + y)
 
 
 def test_fun_down(y, m, q, sigma, delta, a=A_HUBER):
     return a / np.sqrt(q) * ((sigma + 1) + y)
 
 
-def integral_fpe(integral_form, border_fun_plus, border_fun_minus, test_function, m, q, sigma, delta):
+def integral_fpe(
+    integral_form, border_fun_plus, border_fun_minus, test_function, m, q, sigma, delta
+):
     borders = find_integration_borders(
-        lambda y, xi: integral_form(y, xi, q, m, sigma, delta),
-        np.sqrt(1 + delta),
-        1.0
+        lambda y, xi: integral_form(y, xi, q, m, sigma, delta), np.sqrt(1 + delta), 1.0
     )
 
     [_, max_val], _ = borders
@@ -314,54 +338,39 @@ def integral_fpe(integral_form, border_fun_plus, border_fun_minus, test_function
     #     xi_test, xi_test_2, max_val))
 
     if xi_test > max_val:
-        # print("case 1")
+        #  print("case 1")
         domain_xi = [[-max_val, max_val]] * 3
         domain_y = [
-            [
-                lambda xi: border_fun_plus(xi, m, q, sigma, delta),
-                lambda xi: max_val
-            ],
+            [lambda xi: border_fun_plus(xi, m, q, sigma, delta), lambda xi: max_val],
             [
                 lambda xi: border_fun_minus(xi, m, q, sigma, delta),
-                lambda xi: border_fun_plus(xi, m, q, sigma, delta)
+                lambda xi: border_fun_plus(xi, m, q, sigma, delta),
             ],
-            [
-                lambda xi: -max_val,
-                lambda xi: border_fun_minus(xi, m, q, sigma, delta)
-            ],
+            [lambda xi: -max_val, lambda xi: border_fun_minus(xi, m, q, sigma, delta)],
         ]
     elif xi_test >= 0:
         xi_test_2 = test_function(-max_val, m, q, sigma, delta)
         if xi_test_2 < -max_val:
-            # print("case 2.A")
+            #  print("case 2.A")
             domain_xi = [
                 [-max_val, xi_test],
                 [-xi_test, max_val],
                 [-max_val, -xi_test],
                 [xi_test, max_val],
-                [-xi_test, xi_test]
+                [-xi_test, xi_test],
             ]
             domain_y = [
+                [lambda xi: border_fun_plus(xi, m, q, sigma, delta), lambda xi: max_val],
                 [
+                    lambda xi: -max_val,
+                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
+                ],
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma, delta)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma, delta), lambda xi: max_val],
+                [
+                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
                     lambda xi: border_fun_plus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
                 ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta)
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta)
-                ],
-                [
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
-                ],
-                [
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta)
-                ]
             ]
         else:
             # print("case 2.B")
@@ -372,39 +381,24 @@ def integral_fpe(integral_form, border_fun_plus, border_fun_minus, test_function
                 [xi_test, -xi_test_2],
                 [-xi_test, xi_test],
                 [-max_val, xi_test_2],
-                [-xi_test_2, max_val]
+                [-xi_test_2, max_val],
             ]
             domain_y = [
+                [lambda xi: border_fun_plus(xi, m, q, sigma, delta), lambda xi: max_val],
                 [
+                    lambda xi: -max_val,
+                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
+                ],
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma, delta)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma, delta), lambda xi: max_val],
+                [
+                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
                     lambda xi: border_fun_plus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
                 ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta)
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta)
-                ],
-                [
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
-                ],
-                [
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta),
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta)
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: max_val
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: max_val
-                ]
+                [lambda xi: -max_val, lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
             ]
-    elif xi_test > - max_val:
+    elif xi_test > -max_val:
         xi_test_2 = test_function(-max_val, m, q, sigma, delta)
         if xi_test_2 < -max_val:
             # print("case 3.A")
@@ -413,29 +407,17 @@ def integral_fpe(integral_form, border_fun_plus, border_fun_minus, test_function
                 [-xi_test, max_val],
                 [-max_val, xi_test],
                 [-xi_test, max_val],
-                [xi_test, -xi_test]
+                [xi_test, -xi_test],
             ]
             domain_y = [
-                [
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
-                ],
+                [lambda xi: border_fun_plus(xi, m, q, sigma, delta), lambda xi: max_val],
                 [
                     lambda xi: -max_val,
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta)
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta)
-                ],
-                [
                     lambda xi: border_fun_minus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
                 ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: max_val
-                ]
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma, delta)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma, delta), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
             ]
         else:
             # print("case 3.B")
@@ -446,49 +428,24 @@ def integral_fpe(integral_form, border_fun_plus, border_fun_minus, test_function
                 [-xi_test, -xi_test_2],
                 [xi_test, -xi_test],
                 [-max_val, xi_test_2],
-                [-xi_test_2, max_val]
+                [-xi_test_2, max_val],
             ]
             domain_y = [
-                [
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
-                ],
+                [lambda xi: border_fun_plus(xi, m, q, sigma, delta), lambda xi: max_val],
                 [
                     lambda xi: -max_val,
-                    lambda xi: border_fun_minus(xi, m, q, sigma, delta)
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: border_fun_plus(xi, m, q, sigma, delta)
-                ],
-                [
                     lambda xi: border_fun_minus(xi, m, q, sigma, delta),
-                    lambda xi: max_val
                 ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: max_val
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: max_val
-                ],
-                [
-                    lambda xi: -max_val,
-                    lambda xi: max_val
-                ]
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma, delta)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma, delta), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
             ]
     else:
         # print("case 4")
-        domain_xi = [
-            [-max_val, max_val]
-        ]
-        domain_y = [
-            [
-                lambda xi: -max_val,
-                lambda xi: max_val
-            ]
-        ]
+        domain_xi = [[-max_val, max_val]]
+        domain_y = [[lambda xi: -max_val, lambda xi: max_val]]
 
     integral_value = 0.0
     for xi_funs, y_funs in zip(domain_xi, domain_y):
@@ -505,9 +462,7 @@ def integral_fpe(integral_form, border_fun_plus, border_fun_minus, test_function
 
 def m_hat_equation_L1(m, q, sigma, delta):
     borders = find_integration_borders(
-        lambda y, xi: m_integral_L1(y, xi, q, m, sigma, delta),
-        np.sqrt((1 + delta)),
-        1.0
+        lambda y, xi: m_integral_L1(y, xi, q, m, sigma, delta), np.sqrt((1 + delta)), 1.0
     )
     first_integral = dblquad(
         m_integral_L1,
@@ -538,9 +493,7 @@ def m_hat_equation_L1(m, q, sigma, delta):
 
 def q_hat_equation_L1(m, q, sigma, delta):
     borders = find_integration_borders(
-        lambda y, xi: q_integral_L1(y, xi, q, m, sigma, delta),
-        np.sqrt((1 + delta)),
-        1.0,
+        lambda y, xi: q_integral_L1(y, xi, q, m, sigma, delta), np.sqrt((1 + delta)), 1.0,
     )
     first_integral = dblquad(
         q_integral_L1,
@@ -613,18 +566,12 @@ def m_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
     if test_value > borders[0][1]:
         domain_xi = [borders[0]] * 3
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
             [
                 lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
                 lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
             ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
         ]
     elif test_value >= 0:
         domain_xi = [
@@ -635,22 +582,10 @@ def m_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
             [-test_value, test_value],
         ]
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-            ],
-            [
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-                lambda xi: borders[1][1],
-            ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
             [
                 lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
                 lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
@@ -665,23 +600,11 @@ def m_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
             [test_value, -test_value],
         ]
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-            ],
-            [
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [lambda xi: borders[1][0], lambda xi: borders[1][1], ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: borders[1][1],],
         ]
 
     integral_value = 0.0
@@ -743,18 +666,12 @@ def q_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
     if test_value > borders[0][1]:
         domain_xi = [borders[0]] * 3
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
             [
                 lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
                 lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
             ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
         ]
     elif test_value >= 0:
         domain_xi = [
@@ -765,22 +682,10 @@ def q_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
             [-test_value, test_value],
         ]
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-            ],
-            [
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-                lambda xi: borders[1][1],
-            ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
             [
                 lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
                 lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
@@ -795,23 +700,11 @@ def q_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
             [test_value, -test_value],
         ]
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-            ],
-            [
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [lambda xi: borders[1][0], lambda xi: borders[1][1], ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: borders[1][1],],
         ]
 
     integral_value = 0.0
@@ -838,18 +731,12 @@ def sigma_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
     if test_value > borders[0][1]:
         domain_xi = [borders[0]] * 3
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
             [
                 lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
                 lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
             ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
         ]
     elif test_value >= 0:
         domain_xi = [
@@ -860,22 +747,10 @@ def sigma_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
             [-test_value, test_value],
         ]
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-            ],
-            [
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-                lambda xi: borders[1][1],
-            ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
             [
                 lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
                 lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
@@ -890,23 +765,11 @@ def sigma_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):
             [test_value, -test_value],
         ]
         domain_y = [
-            [
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-            ],
-            [
-                lambda xi: borders[1][0],
-                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
-            ],
-            [
-                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
-                lambda xi: borders[1][1],
-            ],
-            [lambda xi: borders[1][0], lambda xi: borders[1][1], ],
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: borders[1][1],],
         ]
 
     integral_value = 0.0
@@ -953,8 +816,7 @@ def state_equations_convergence(
         q = blend * q + (1 - blend) * temp_q
         sigma = blend * sigma + (1 - blend) * temp_sigma
         if verbose:
-            print(
-                f"i = {iter} m = {m}, q = {q}, sigma = {sigma}, eta = {m**2/q}")
+            print(f"i = {iter} m = {m}, q = {q}, sigma = {sigma}, eta = {m**2/q}")
         iter += 1
     return m, q, sigma
 

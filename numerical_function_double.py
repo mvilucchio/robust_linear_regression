@@ -1,4 +1,5 @@
 from tqdm.auto import tqdm
+
 # from cv2 import integral
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,21 +15,39 @@ MULT_INTEGRAL = 5
 A_HUBER = 1.0
 EPS = 0.1
 
+
 @nb.njit(error_model="numpy", fastmath=True)
 def ZoutBayes_eps(y, omega, V, delta_small, delta_large, eps):
-    return (
-        (1 - eps) * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small))) / np.sqrt(2*np.pi*(V + delta_small))
-        + eps * np.exp(-((y - omega) ** 2) / (2 * (V + delta_large))) / np.sqrt(2*np.pi*(V + delta_large)) 
+    return (1 - eps) * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small))) / np.sqrt(
+        2 * np.pi * (V + delta_small)
+    ) + eps * np.exp(-((y - omega) ** 2) / (2 * (V + delta_large))) / np.sqrt(
+        2 * np.pi * (V + delta_large)
     )
 
 
 @nb.njit(error_model="numpy", fastmath=True)
 def foutBayes_eps(y, omega, V, delta_small, delta_large, eps):
     return (
-        (y - omega) / ((V + delta_small) * (V + delta_large))
-        / ( eps * np.exp(((y - omega) ** 2) / (2 * (V + delta_small))) * np.sqrt(V + delta_small) + (1 - eps) * np.exp(((y - omega) ** 2) / (2 * (V + delta_large))) * np.sqrt(V + delta_large) )
-        * ( eps * np.exp(((y - omega) ** 2) / (2 * (V + delta_small))) * np.sqrt((V + delta_small)**3) + (1 - eps) * np.exp(((y - omega) ** 2) / (2 * (V + delta_large))) * np.sqrt((V + delta_large)**3) )
+        (y - omega)
+        / ((V + delta_small) * (V + delta_large))
+        / (
+            eps
+            * np.exp(((y - omega) ** 2) / (2 * (V + delta_small)))
+            * np.sqrt(V + delta_small)
+            + (1 - eps)
+            * np.exp(((y - omega) ** 2) / (2 * (V + delta_large)))
+            * np.sqrt(V + delta_large)
+        )
+        * (
+            eps
+            * np.exp(((y - omega) ** 2) / (2 * (V + delta_small)))
+            * np.sqrt((V + delta_small) ** 3)
+            + (1 - eps)
+            * np.exp(((y - omega) ** 2) / (2 * (V + delta_large)))
+            * np.sqrt((V + delta_large) ** 3)
+        )
     )
+
 
 @nb.njit(error_model="numpy", fastmath=True)
 def foutL2(y, omega, V):
@@ -70,13 +89,16 @@ def DfoutHuber(y, omega, V, a=A_HUBER):
     if (y < omega and a + a * V + y < omega) or (a + a * V + omega < y):
         return 0.0
     else:
-        return - 1.0 / (1 + V)
+        return -1.0 / (1 + V)
+
 
 # -----
 
-def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, n_points=300):
-    borders = [[-mult * scale1, mult * scale1],
-               [-mult * scale2, mult * scale2]]
+
+def find_integration_borders(
+    fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, n_points=300
+):
+    borders = [[-mult * scale1, mult * scale1], [-mult * scale2, mult * scale2]]
 
     for idx, ax in enumerate(borders):
         for jdx, border in enumerate(ax):
@@ -89,7 +111,7 @@ def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, 
                             for pt in np.linspace(
                                 borders[1 if idx == 0 else 0][0],
                                 borders[1 if idx == 0 else 0][1],
-                                n_points
+                                n_points,
                             )
                         ]
                     )
@@ -100,7 +122,7 @@ def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, 
                             for pt in np.linspace(
                                 borders[1 if idx == 0 else 0][0],
                                 borders[1 if idx == 0 else 0][1],
-                                n_points
+                                n_points,
                             )
                         ]
                     )
@@ -121,7 +143,23 @@ def find_integration_borders(fun, scale1, scale2, mult=MULT_INTEGRAL, tol=1e-6, 
 
     return borders
 
+
 # -----
+
+
+@nb.njit(error_model="numpy", fastmath=True)
+def q_integral_BO_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes_eps(y, np.sqrt(q) * xi, 1 - q, delta_small, delta_large, eps)
+        * (foutBayes_eps(y, np.sqrt(q) * xi, 1 - q, delta_small, delta_large, eps) ** 2)
+    )
+
+
+# -----
+
 
 @nb.njit(error_model="numpy", fastmath=True)
 def m_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
@@ -134,6 +172,7 @@ def m_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
         * foutL2(y, np.sqrt(q) * xi, sigma)
     )
 
+
 @nb.njit(error_model="numpy", fastmath=True)
 def q_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
     eta = m ** 2 / q
@@ -143,6 +182,7 @@ def q_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
         * ZoutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
         * (foutL2(y, np.sqrt(q) * xi, sigma) ** 2)
     )
+
 
 @nb.njit(error_model="numpy", fastmath=True)
 def sigma_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
@@ -154,11 +194,32 @@ def sigma_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
         * DfoutL2(y, np.sqrt(q) * xi, sigma)
     )
 
+
 # -----
 
-def m_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps = EPS):
+def q_hat_equation_BO_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
     borders = find_integration_borders(
-        lambda y, xi: m_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps),
+        lambda y, xi: q_integral_BO_eps(
+            y, xi, q, m, sigma, delta_small, delta_large, eps
+        ),
+        np.sqrt((1 + delta_small)),
+        1.0,
+    )
+    return dblquad(
+        q_integral_BO_eps,
+        borders[0][0],
+        borders[0][1],
+        borders[1][0],
+        borders[1][1],
+        args=(q, m, sigma, delta_small, delta_large, eps),
+    )[0]
+
+
+def m_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
+    borders = find_integration_borders(
+        lambda y, xi: m_integral_L2_eps(
+            y, xi, q, m, sigma, delta_small, delta_large, eps
+        ),
         np.sqrt((1 + delta_small)),
         1.0,
     )
@@ -168,14 +229,17 @@ def m_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps = EPS):
         borders[0][1],
         borders[1][0],
         borders[1][1],
-        args=(q, m, sigma, delta_small, delta_large, eps)
+        args=(q, m, sigma, delta_small, delta_large, eps),
     )[0]
 
-def q_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps = EPS):
+
+def q_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
     borders = find_integration_borders(
-        lambda y, xi: q_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps),
+        lambda y, xi: q_integral_L2_eps(
+            y, xi, q, m, sigma, delta_small, delta_large, eps
+        ),
         np.sqrt((1 + delta_small)),
-        1.0
+        1.0,
     )
     return dblquad(
         q_integral_L2_eps,
@@ -186,9 +250,12 @@ def q_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps = EPS):
         args=(q, m, sigma, delta_small, delta_large, eps),
     )[0]
 
-def sigma_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps = EPS):
+
+def sigma_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
     borders = find_integration_borders(
-        lambda y, xi: sigma_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps),
+        lambda y, xi: sigma_integral_L2_eps(
+            y, xi, q, m, sigma, delta_small, delta_large, eps
+        ),
         np.sqrt((1 + delta_small)),
         1.0,
     )
@@ -201,19 +268,35 @@ def sigma_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps = EPS):
         args=(q, m, sigma, delta_small, delta_large, eps),
     )[0]
 
+
 # -----------
-    
-def state_equations_convergence(var_func, var_hat_func, delta_small=0.1, delta_large=1.0, lambd=0.01, alpha=0.5, eps=0.1, init=(0.5, 0.5, 0.5), verbose=False):
+
+
+def state_equations_convergence(
+    var_func,
+    var_hat_func,
+    delta_small=0.1,
+    delta_large=1.0,
+    lambd=0.01,
+    alpha=0.5,
+    eps=0.1,
+    init=(0.5, 0.5, 0.5),
+    verbose=False,
+):
     m, q, sigma = init[0], init[1], init[2]
     err = 1.0
     blend = 0.5
     iter = 0
     while err > 1e-6:
-        m_hat, q_hat, sigma_hat = var_hat_func(m, q, sigma, alpha, delta_small, delta_large, eps=eps)
+        m_hat, q_hat, sigma_hat = var_hat_func(
+            m, q, sigma, alpha, delta_small, delta_large, eps=eps
+        )
 
         temp_m, temp_q, temp_sigma = m, q, sigma
 
-        m, q, sigma = var_func(m_hat, q_hat, sigma_hat, alpha, delta_small, delta_large, lambd)
+        m, q, sigma = var_func(
+            m_hat, q_hat, sigma_hat, alpha, delta_small, delta_large, lambd
+        )
 
         err = np.max(np.abs([(temp_m - m), (temp_q - q), (temp_sigma - sigma)]))
 
@@ -223,8 +306,9 @@ def state_equations_convergence(var_func, var_hat_func, delta_small=0.1, delta_l
         if verbose:
             print("i : {} m : {} q : {} sigma : {}".format(iter, m, q, sigma))
 
-        iter +=1
+        iter += 1
     return m, q, sigma
+
 
 if __name__ == "__main__":
     # test the convergence
@@ -233,14 +317,19 @@ if __name__ == "__main__":
     lambdas = [1.0]
 
     for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-        for jdx, [delta_small, delta_large] in enumerate(tqdm(deltas, desc="delta", leave=False)):
+        for jdx, [delta_small, delta_large] in enumerate(
+            tqdm(deltas, desc="delta", leave=False)
+        ):
             i = idx * len(deltas) + jdx
 
             while True:
                 m = np.random.random()
                 q = np.random.random()
                 sigma = np.random.random()
-                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
                     break
 
             initial = [m, q, sigma]
