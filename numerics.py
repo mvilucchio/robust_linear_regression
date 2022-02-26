@@ -168,9 +168,9 @@ def generate_different_alpha_double_noise(
 
 
 @nb.njit(error_model="numpy", fastmath=True)
-def find_coefficients_ridge(ys, xs, l=1.0):
+def find_coefficients_ridge(ys, xs, reg_param=1.0):
     n, d = xs.shape
-    a = np.divide(xs.T.dot(xs), d) + l * np.identity(d)
+    a = np.divide(xs.T.dot(xs), d) + reg_param * np.identity(d)
     b = np.divide(xs.T.dot(ys), np.sqrt(d))
     return np.linalg.solve(a, b)
 
