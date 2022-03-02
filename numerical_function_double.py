@@ -29,22 +29,21 @@ def ZoutBayes_eps(y, omega, V, delta_small, delta_large, eps):
 def foutBayes_eps(y, omega, V, delta_small, delta_large, eps):
     return (
         (y - omega)
-        / ((V + delta_small) * (V + delta_large))
-        / (
-            eps
-            * np.exp(((y - omega) ** 2) / (2 * (V + delta_small)))
-            * np.sqrt(V + delta_small)
-            + (1 - eps)
-            * np.exp(((y - omega) ** 2) / (2 * (V + delta_large)))
-            * np.sqrt(V + delta_large)
-        )
         * (
-            eps
-            * np.exp(((y - omega) ** 2) / (2 * (V + delta_small)))
-            * np.sqrt((V + delta_small) ** 3)
-            + (1 - eps)
-            * np.exp(((y - omega) ** 2) / (2 * (V + delta_large)))
-            * np.sqrt((V + delta_large) ** 3)
+            (1 - eps)
+            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
+            / np.power(V + delta_small, 3 / 2)
+            + eps
+            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_large)))
+            / np.power(V + delta_large, 3 / 2)
+        )
+        / (
+            (1 - eps)
+            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
+            / np.power(V + delta_small, 1 / 2)
+            + eps
+            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_large)))
+            / np.power(V + delta_large, 1 / 2)
         )
     )
 
@@ -149,7 +148,6 @@ def find_integration_borders(
 
 @nb.njit(error_model="numpy", fastmath=True)
 def q_integral_BO_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
-    eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
@@ -197,6 +195,50 @@ def sigma_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
 
 # -----
 
+
+@nb.njit(error_model="numpy", fastmath=True)
+def m_integral_Huber_eps(
+    y, xi, q, m, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER
+):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
+        * foutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
+        * foutHuber(y, np.sqrt(q) * xi, sigma, a=a)
+    )
+
+
+@nb.njit(error_model="numpy", fastmath=True)
+def q_integral_Huber_eps(
+    y, xi, q, m, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER
+):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
+        * (foutHuber(y, np.sqrt(q) * xi, sigma, a=a) ** 2)
+    )
+
+
+@nb.njit(error_model="numpy", fastmath=True)
+def sigma_integral_Huber_eps(
+    y, xi, q, m, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER
+):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
+        * DfoutHuber(y, np.sqrt(q) * xi, sigma, a=a)
+    )
+
+
+# -----
+
+
 def q_hat_equation_BO_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
     borders = find_integration_borders(
         lambda y, xi: q_integral_BO_eps(
@@ -213,6 +255,9 @@ def q_hat_equation_BO_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
         borders[1][1],
         args=(q, m, sigma, delta_small, delta_large, eps),
     )[0]
+
+
+# -----
 
 
 def m_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
@@ -272,6 +317,372 @@ def sigma_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
 # -----------
 
 
+def border_plus_Huber(xi, m, q, sigma, a=A_HUBER):
+    return np.sqrt(q) / a * xi + (sigma + 1)
+
+
+def border_minus_Huber(xi, m, q, sigma, a=A_HUBER):
+    return np.sqrt(q) / a * xi - (sigma + 1)
+
+
+def test_fun_upper_Huber(y, m, q, sigma, a=A_HUBER):
+    return a / np.sqrt(q) * (-(sigma + 1) + y)
+
+
+def test_fun_down_Huber(y, m, q, sigma, a=A_HUBER):
+    return a / np.sqrt(q) * ((sigma + 1) + y)
+
+
+def integral_fpe(
+    integral_form,
+    border_fun_plus,
+    border_fun_minus,
+    test_function,
+    m,
+    q,
+    sigma,
+    delta_small,
+    delta_large,
+    eps=EPS,
+):
+    borders = find_integration_borders(
+        lambda y, xi: integral_form(
+            y, xi, q, m, sigma, delta_small, delta_large, eps=EPS
+        ),
+        np.sqrt(1 + delta_small),
+        1.0,
+    )
+
+    [_, max_val], _ = borders
+
+    # print("border is: ", max_val)
+
+    xi_test = test_function(max_val, m, q, sigma)
+    xi_test_2 = test_function(-max_val, m, q, sigma)
+    # print("xi_test : {} xi_test_2 : {} max_val : {}".format(
+    #     xi_test, xi_test_2, max_val))
+
+    if xi_test > max_val:
+        # print("case 1")
+        domain_xi = [[-max_val, max_val]] * 3
+        domain_y = [
+            [lambda xi: border_fun_plus(xi, m, q, sigma), lambda xi: max_val],
+            [
+                lambda xi: border_fun_minus(xi, m, q, sigma),
+                lambda xi: border_fun_plus(xi, m, q, sigma),
+            ],
+            [lambda xi: -max_val, lambda xi: border_fun_minus(xi, m, q, sigma)],
+        ]
+    elif xi_test >= 0:
+        xi_test_2 = test_function(-max_val, m, q, sigma)
+        if xi_test_2 < -max_val:
+            # print("case 2.A")
+            domain_xi = [
+                [-max_val, xi_test],
+                [-xi_test, max_val],
+                [-max_val, -xi_test],
+                [xi_test, max_val],
+                [-xi_test, xi_test],
+            ]
+            domain_y = [
+                [lambda xi: border_fun_plus(xi, m, q, sigma), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: border_fun_minus(xi, m, q, sigma),],
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma), lambda xi: max_val],
+                [
+                    lambda xi: border_fun_minus(xi, m, q, sigma),
+                    lambda xi: border_fun_plus(xi, m, q, sigma),
+                ],
+            ]
+        else:
+            # print("case 2.B")
+            domain_xi = [
+                [xi_test_2, xi_test],
+                [-xi_test, -xi_test_2],
+                [xi_test_2, -xi_test],
+                [xi_test, -xi_test_2],
+                [-xi_test, xi_test],
+                [-max_val, xi_test_2],
+                [-xi_test_2, max_val],
+            ]
+            domain_y = [
+                [lambda xi: border_fun_plus(xi, m, q, sigma), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: border_fun_minus(xi, m, q, sigma),],
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma), lambda xi: max_val],
+                [
+                    lambda xi: border_fun_minus(xi, m, q, sigma),
+                    lambda xi: border_fun_plus(xi, m, q, sigma),
+                ],
+                [lambda xi: -max_val, lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
+            ]
+    elif xi_test > -max_val:
+        xi_test_2 = test_function(-max_val, m, q, sigma)
+        if xi_test_2 < -max_val:
+            # print("case 3.A")
+            domain_xi = [
+                [-max_val, xi_test],
+                [-xi_test, max_val],
+                [-max_val, xi_test],
+                [-xi_test, max_val],
+                [xi_test, -xi_test],
+            ]
+            domain_y = [
+                [lambda xi: border_fun_plus(xi, m, q, sigma), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: border_fun_minus(xi, m, q, sigma),],
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
+            ]
+        else:
+            # print("case 3.B")
+            domain_xi = [
+                [xi_test_2, xi_test],
+                [-xi_test, -xi_test_2],
+                [xi_test_2, xi_test],
+                [-xi_test, -xi_test_2],
+                [xi_test, -xi_test],
+                [-max_val, xi_test_2],
+                [-xi_test_2, max_val],
+            ]
+            domain_y = [
+                [lambda xi: border_fun_plus(xi, m, q, sigma), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: border_fun_minus(xi, m, q, sigma),],
+                [lambda xi: -max_val, lambda xi: border_fun_plus(xi, m, q, sigma)],
+                [lambda xi: border_fun_minus(xi, m, q, sigma), lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
+                [lambda xi: -max_val, lambda xi: max_val],
+            ]
+    else:
+        # print("case 4")
+        domain_xi = [[-max_val, max_val]]
+        domain_y = [[lambda xi: -max_val, lambda xi: max_val]]
+
+    integral_value = 0.0
+    for xi_funs, y_funs in zip(domain_xi, domain_y):
+        integral_value += dblquad(
+            integral_form,
+            xi_funs[0],
+            xi_funs[1],
+            y_funs[0],
+            y_funs[1],
+            args=(q, m, sigma, delta_small, delta_large, eps),
+        )[0]
+    return integral_value
+
+
+# ------------------
+
+
+def m_hat_equation_Huber_eps(m, q, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER):
+    borders = find_integration_borders(
+        lambda y, xi: m_integral_Huber_eps(
+            y, xi, q, m, sigma, delta_small, delta_large, eps, a
+        ),
+        np.sqrt((1 + delta_small)),
+        1.0,
+    )
+
+    test_value = (np.sqrt(q) * borders[0][1] + a * sigma + a) / a
+    if test_value > borders[0][1]:
+        domain_xi = [borders[0]] * 3
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [
+                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
+                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
+            ],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+        ]
+    elif test_value >= 0:
+        domain_xi = [
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [borders[0][0], -test_value],
+            [test_value, borders[0][1]],
+            [-test_value, test_value],
+        ]
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [
+                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
+                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
+            ],
+        ]
+    else:
+        domain_xi = [
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [test_value, -test_value],
+        ]
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: borders[1][1],],
+        ]
+
+    integral_value = 0.0
+    for xi_funs, y_funs in zip(domain_xi, domain_y):
+        integral_value += dblquad(
+            m_integral_Huber_eps,
+            xi_funs[0],
+            xi_funs[1],
+            y_funs[0],
+            y_funs[1],
+            args=(q, m, sigma, delta_small, delta_large, eps, a),
+        )[0]
+
+    return integral_value
+
+
+def q_hat_equation_Huber_eps(m, q, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER):
+    borders = find_integration_borders(
+        lambda y, xi: q_integral_Huber_eps(
+            y, xi, q, m, sigma, delta_small, delta_large, eps, a
+        ),
+        np.sqrt((1 + delta_small)),
+        1.0,
+    )
+
+    test_value = (np.sqrt(q) * borders[0][1] + a * sigma + a) / a
+    if test_value > borders[0][1]:
+        domain_xi = [borders[0]] * 3
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [
+                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
+                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
+            ],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+        ]
+    elif test_value >= 0:
+        domain_xi = [
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [borders[0][0], -test_value],
+            [test_value, borders[0][1]],
+            [-test_value, test_value],
+        ]
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [
+                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
+                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
+            ],
+        ]
+    else:
+        domain_xi = [
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [test_value, -test_value],
+        ]
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: borders[1][1],],
+        ]
+
+    integral_value = 0.0
+    for xi_funs, y_funs in zip(domain_xi, domain_y):
+        integral_value += dblquad(
+            q_integral_Huber_eps,
+            xi_funs[0],
+            xi_funs[1],
+            y_funs[0],
+            y_funs[1],
+            args=(q, m, sigma, delta_small, delta_large, eps, a),
+        )[0]
+    return integral_value
+
+
+def sigma_hat_equation_Huber_eps(
+    m, q, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER
+):
+    borders = find_integration_borders(
+        lambda y, xi: sigma_integral_Huber_eps(
+            y, xi, q, m, sigma, delta_small, delta_large, eps, a
+        ),
+        np.sqrt((1 + delta_small)),
+        1.0,
+    )
+
+    test_value = (np.sqrt(q) * borders[0][1] + a * sigma + a) / a
+    if test_value > borders[0][1]:
+        domain_xi = [borders[0]] * 3
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [
+                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
+                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
+            ],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+        ]
+    elif test_value >= 0:
+        domain_xi = [
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [borders[0][0], -test_value],
+            [test_value, borders[0][1]],
+            [-test_value, test_value],
+        ]
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [
+                lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,
+                lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,
+            ],
+        ]
+    else:
+        domain_xi = [
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [borders[0][0], test_value],
+            [-test_value, borders[0][1]],
+            [test_value, -test_value],
+        ]
+        domain_y = [
+            [lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a,],
+            [lambda xi: borders[1][0], lambda xi: (np.sqrt(q) * xi + a * sigma + a) / a,],
+            [lambda xi: (np.sqrt(q) * xi - a * sigma - a) / a, lambda xi: borders[1][1],],
+            [lambda xi: borders[1][0], lambda xi: borders[1][1],],
+        ]
+
+    integral_value = 0.0
+    for xi_funs, y_funs in zip(domain_xi, domain_y):
+        integral_value += dblquad(
+            sigma_integral_Huber_eps,
+            xi_funs[0],
+            xi_funs[1],
+            y_funs[0],
+            y_funs[1],
+            args=(q, m, sigma, delta_small, delta_large, eps, a),
+        )[0]
+    return integral_value
+
+
+# -------------------
+
+
 def state_equations_convergence(
     var_func,
     var_hat_func,
@@ -312,8 +723,8 @@ def state_equations_convergence(
 
 if __name__ == "__main__":
     # test the convergence
-    alpha = 7.4
-    deltas = [[1.0, 10.0]]
+    alpha = 0.05
+    deltas = [[0.5, 1.5]]
     lambdas = [1.0]
 
     for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
@@ -336,7 +747,7 @@ if __name__ == "__main__":
 
             _, _, _ = state_equations_convergence(
                 fpedb.var_func_L2,
-                fpedb.var_hat_func_L2_num_eps,
+                fpedb.var_hat_func_Huber_num_eps,
                 delta_small=delta_small,
                 delta_large=delta_large,
                 lambd=l,

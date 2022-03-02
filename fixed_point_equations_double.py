@@ -5,6 +5,31 @@ import scipy.stats as stats
 from tqdm.auto import tqdm
 import numerical_functions as numfun
 import numerical_function_double as numfuneps
+import os
+from src.utils import file_name_generator
+
+
+theory_path = "./data/theory"
+experiments_path = "./data/experiments"
+
+data_dir_exists = os.path.exists("./data")
+if not data_dir_exists:
+    os.makedirs("./data")
+    os.makedirs("./data/theory")
+    os.makedirs("./data/experiments")
+
+theory_dir_exists = os.path.exists("./data/theory")
+experiments_dir_exists = os.path.exists("./data/experiments")
+
+if not theory_dir_exists:
+    os.makedirs("./data/theory")
+
+if not experiments_dir_exists:
+    os.makedirs("./data/experiments")
+
+random_number = np.random.randint(0, 100)
+
+names_cm = ["Purples", "Blues", "Greens", "Oranges", "Greys"]
 
 
 def get_cmap(n, name="hsv"):
@@ -24,7 +49,7 @@ def state_equations(
     m, q, sigma = init[0], init[1], init[2]
     err = 1.0
     blend = 0.5
-    while err > 1e-4:
+    while err > 1e-6:
         m_hat, q_hat, sigma_hat = var_hat_func(
             m, q, sigma, alpha, delta_small, delta_large, eps=eps
         )
@@ -73,6 +98,7 @@ def projection_ridge_different_alpha_theory(
     for i, alpha in enumerate(
         tqdm(alphas, desc="alpha", disable=not verbose, leave=False)
     ):
+        # print(alpha)
         m, q, _ = state_equations(
             var_func,
             var_hat_func,
@@ -120,12 +146,72 @@ def var_hat_func_L2_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps=0.
     return m_hat, q_hat, sigma_hat
 
 
+# def var_hat_func_Huber_num_eps(
+#     m, q, sigma, alpha, delta_small, delta_large, eps=0.1, a=1.0
+# ):
+#     m_hat = alpha * numfuneps.m_hat_equation_Huber_eps(
+#         m, q, sigma, delta_small, delta_large, eps=eps, a=a
+#     )
+#     q_hat = alpha * numfuneps.q_hat_equation_Huber_eps(
+#         m, q, sigma, delta_small, delta_large, eps=eps, a=a
+#     )
+#     sigma_hat = -alpha * numfuneps.sigma_hat_equation_Huber_eps(
+#         m, q, sigma, delta_small, delta_large, eps=eps, a=a
+#     )
+#     return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_Huber_num_eps(
+    m, q, sigma, alpha, delta_small, delta_large, eps=0.1, a=1.0
+):
+    m_hat = alpha * numfuneps.integral_fpe(
+        numfuneps.m_integral_Huber_eps,
+        numfuneps.border_plus_Huber,
+        numfuneps.border_minus_Huber,
+        numfuneps.test_fun_upper_Huber,
+        m,
+        q,
+        sigma,
+        delta_small,
+        delta_large,
+        eps,
+    )
+    q_hat = alpha * numfuneps.integral_fpe(
+        numfuneps.q_integral_Huber_eps,
+        numfuneps.border_plus_Huber,
+        numfuneps.border_minus_Huber,
+        numfuneps.test_fun_upper_Huber,
+        m,
+        q,
+        sigma,
+        delta_small,
+        delta_large,
+        eps,
+    )
+    sigma_hat = -alpha * numfuneps.integral_fpe(
+        numfuneps.sigma_integral_Huber_eps,
+        numfuneps.border_plus_Huber,
+        numfuneps.border_minus_Huber,
+        numfuneps.test_fun_upper_Huber,
+        m,
+        q,
+        sigma,
+        delta_small,
+        delta_large,
+        eps,
+    )
+    return m_hat, q_hat, sigma_hat
+
+
 if __name__ == "__main__":
+    loss_name = "Huber"
     alpha_min, alpha_max = 0.01, 100
     eps = 0.1
-    alpha_points = 21
-    deltas = [[1.0, 2.0], [1.0, 5.0], [1.0, 10.0]]  # , [1.0, 5.0], [1.0, 10.0]
-    lambdas = [0.01]  # 0.01, 0.1, 1.0, 10.0, 100.0
+    alpha_points = 15
+    deltas = [[1.0, 2.0], [1.0, 5.0], [1.0, 10.0]]  #
+    lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]  #
+
+    random_number = np.random.randint(0, 100)
 
     alphas = [None] * len(deltas) * len(lambdas)
     errors = [None] * len(deltas) * len(lambdas)
@@ -136,32 +222,59 @@ if __name__ == "__main__":
         for jdx, (delta_small, delta_large) in enumerate(
             tqdm(deltas, desc="delta", leave=False)
         ):
-            while True:
-                m = 0.89 * np.random.random() + 0.1
-                q = 0.89 * np.random.random() + 0.1
-                sigma = 0.89 * np.random.random() + 0.1
-                if (
-                    np.square(m) < q + delta_small * q
-                    and np.square(m) < q + delta_large * q
-                ):
-                    break
+            file_path = os.path.join(
+                theory_path,
+                file_name_generator(
+                    loss_name,
+                    alpha_min,
+                    alpha_max,
+                    alpha_points,
+                    0.0,
+                    0,
+                    l,
+                    delta_small,
+                    delta_large=delta_large,
+                    eps=eps,
+                    experiment=False,
+                ),
+            )
 
-            initial = [m, q, sigma]
+            file_exists = os.path.exists(file_path + ".npz")
 
             i = idx * len(deltas) + jdx
 
-            alphas[i], errors[i] = projection_ridge_different_alpha_theory(
-                var_func_BO,
-                var_hat_func_BO_num_eps,
-                alpha_1=alpha_min,
-                alpha_2=alpha_max,
-                n_alpha_points=alpha_points,
-                lambd=l,
-                delta_small=delta_small,
-                delta_large=delta_large,
-                initial_cond=initial,
-                verbose=True,
-            )
+            if not file_exists:
+                while True:
+                    m = 0.89 * np.random.random() + 0.1
+                    q = 0.89 * np.random.random() + 0.1
+                    sigma = 0.89 * np.random.random() + 0.1
+                    if (
+                        np.square(m) < q + delta_small * q
+                        and np.square(m) < q + delta_large * q
+                    ):
+                        break
+
+                initial = [m, q, sigma]
+
+                alphas[i], errors[i] = projection_ridge_different_alpha_theory(
+                    var_func_L2,
+                    var_hat_func_Huber_num_eps,
+                    alpha_1=alpha_min,
+                    alpha_2=alpha_max,
+                    n_alpha_points=alpha_points,
+                    lambd=l,
+                    delta_small=delta_small,
+                    delta_large=delta_large,
+                    initial_cond=initial,
+                    verbose=True,
+                )
+
+                np.savez(file_path, alphas=alphas[i], errors=errors[i])
+            else:
+                stored_data = np.load(file_path + ".npz")
+
+                alphas[i] = stored_data["alphas"]
+                errors[i] = stored_data["errors"]
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
@@ -176,7 +289,7 @@ if __name__ == "__main__":
                 color=colormap(i),
             )
 
-    ax.set_title("L2 Loss - Double Noise")
+    ax.set_title("{} Loss - Double Noise".format(loss_name))
     ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
     ax.set_xlabel(r"$\alpha$")
     ax.set_xscale("log")
@@ -186,7 +299,7 @@ if __name__ == "__main__":
     ax.legend()
 
     fig.savefig(
-        "./imgs/double - [{:.3f}, {:.3f}, {:.3f}].png".format(*initial), format="png"
+        "./imgs/{} - double - {:d}.png".format(loss_name, random_number), format="png",
     )
 
     plt.show()
