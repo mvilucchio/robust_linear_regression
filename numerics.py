@@ -6,6 +6,7 @@ from sklearn.utils.extmath import safe_sparse_dot
 from tqdm.auto import tqdm
 import numba as nb
 
+
 def noise_gen(n_samples=1000, delta=1):
     error_sample = np.sqrt(delta) * np.random.normal(
         loc=0.0, scale=1.0, size=(n_samples,)
@@ -16,8 +17,12 @@ def noise_gen(n_samples=1000, delta=1):
 def noise_gen_double(n_samples=1000, delta_small=1, delta_large=10, eps=0.1):
     choice = np.random.choice([0, 1], p=[1 - eps, eps], size=(n_samples,))
     error_sample = np.empty((n_samples, 2))
-    error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(loc=0.0, scale=1.0, size=(n_samples,))
-    error_sample[:, 1] = np.sqrt(delta_large) * np.random.normal(loc=0.0, scale=1.0, size=(n_samples,))
+    error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(
+        loc=0.0, scale=1.0, size=(n_samples,)
+    )
+    error_sample[:, 1] = np.sqrt(delta_large) * np.random.normal(
+        loc=0.0, scale=1.0, size=(n_samples,)
+    )
     total_error = np.where(choice, error_sample[:, 1], error_sample[:, 0])
     return total_error
 
@@ -64,7 +69,9 @@ def data_generation_double_noise(
     # total_error_gen = noise_gen(n_samples=n_generalization, delta=delta)
 
     ys = np.divide(xs @ theta_0_teacher, np.sqrt(n_features)) + total_error
-    ys_gen = np.divide(xs_gen @ theta_0_teacher, np.sqrt(n_features)) # + total_error_gen # should not be here
+    ys_gen = np.divide(
+        xs_gen @ theta_0_teacher, np.sqrt(n_features)
+    )  # + total_error_gen # should not be here
 
     return xs, ys, xs_gen, ys_gen, theta_0_teacher
 
@@ -136,7 +143,7 @@ def generate_different_alpha_double_noise(
     final_errors_mean = np.empty((n_alpha_points,))
     final_errors_std = np.empty((n_alpha_points,))
 
-    for jdx, alpha in enumerate(alphas):
+    for jdx, alpha in enumerate(tqdm(alphas, desc="alpha", leave=False)):
         all_gen_errors = np.empty((repetitions,))
 
         for idx in tqdm(range(repetitions), desc="reps", leave=False):
@@ -146,7 +153,7 @@ def generate_different_alpha_double_noise(
                 n_generalization=1,
                 delta_small=delta_small,
                 delta_large=delta_large,
-                eps=eps
+                eps=eps,
             )
 
             estimated_theta = find_coefficients_fun(ys, xs, reg_param=lambda_reg)
@@ -174,6 +181,7 @@ def find_coefficients_ridge(ys, xs, reg_param=1.0):
     b = np.divide(xs.T.dot(ys), np.sqrt(d))
     return np.linalg.solve(a, b)
 
+
 # @nb.njit(error_model="numpy", fastmath=True)
 def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
     linear_loss = ys - xs_norm @ w
@@ -186,7 +194,7 @@ def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
     sign_sample[sign_sample_mask] = -1.0
     sign_sample[zero_sample_mask] = 0.0
 
-    gradient = - safe_sparse_dot(sign_sample, xs_norm)
+    gradient = -safe_sparse_dot(sign_sample, xs_norm)
     gradient += reg_param * w
 
     return loss, gradient
@@ -237,7 +245,7 @@ def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
 
     xs_non_outliers = -axis0_safe_slice(xs_norm, ~outliers_mask, n_non_outliers)
     gradient = safe_sparse_dot(non_outliers, xs_non_outliers)
-    
+
     signed_outliers = np.ones_like(outliers)
     signed_outliers_mask = linear_loss[outliers_mask] < 0
     signed_outliers[signed_outliers_mask] = -1.0
@@ -248,6 +256,7 @@ def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
     gradient += reg_param * w
 
     return loss, gradient
+
 
 def find_coefficients_Huber(ys, xs, reg_param=1.0, max_iter=15000, tol=1e-6, a=1.0):
     n, d = xs.shape
@@ -275,6 +284,7 @@ def find_coefficients_Huber(ys, xs, reg_param=1.0, max_iter=15000, tol=1e-6, a=1
 
     return opt_res.x
 
+
 if __name__ == "__main__":
     random_number = np.random.randint(0, 100)
 
@@ -292,9 +302,7 @@ if __name__ == "__main__":
     final_errors_std = [None] * len(deltas) * len(lambdas)
 
     for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-        for jdx, (d_small, d_large) in enumerate(
-            tqdm(deltas, desc="delta", leave=False)
-        ):
+        for jdx, (d_small, d_large) in enumerate(tqdm(deltas, desc="delta", leave=False)):
             i = idx * len(deltas) + jdx
 
             if loss == "L2":
@@ -368,6 +376,8 @@ if __name__ == "__main__":
     ax.grid(True, which="both")
     ax.legend()
 
-    fig.savefig("./imgs/L2_exp_n_10000_lr_1e-3 - {}.png".format(random_number), format="png")
+    fig.savefig(
+        "./imgs/L2_exp_n_10000_lr_1e-3 - {}.png".format(random_number), format="png"
+    )
 
     plt.show()

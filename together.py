@@ -43,19 +43,37 @@ def file_name_generator(
     alpha_points,
     dim,
     reps,
-    delta,
+    delta_small,
+    delta_large,
     lamb,
     eps,
     experiments=True,
     double_noise=True,
 ):
     if experiments:
-        return "{} - eps {} - exp - alphas [{} {} {:d}] - dim {:d} - rep {:d} - delta {} - lambda {}".format(
-            loss_name, eps, alpha_min, alpha_max, alpha_points, dim, reps, delta, lamb
+        return "{} - eps {} - exp - alphas [{} {} {:d}] - dim {:d} - rep {:d} - delta [{} {}] - lambda {}".format(
+            loss_name,
+            eps,
+            alpha_min,
+            alpha_max,
+            alpha_points,
+            dim,
+            reps,
+            delta_small,
+            delta_large,
+            lamb,
         )
     else:
-        return "{} - eps {} - theory - alphas [{} {} {:d}] - rep {:d} - delta {} - lambda {}".format(
-            loss_name, eps, alpha_min, alpha_max, alpha_points, reps, delta, lamb
+        return "{} - eps {} - theory - alphas [{} {} {:d}] - rep {:d} - delta [{} {}] - lambda {}".format(
+            loss_name,
+            eps,
+            alpha_min,
+            alpha_max,
+            alpha_points,
+            reps,
+            delta_small,
+            delta_large,
+            lamb,
         )
 
 
@@ -66,7 +84,7 @@ alpha_points_theory = 51
 alpha_points_num = 31
 d = 500
 reps = 10
-deltas = [1.0]
+deltas = [[1.0, 0.0]]
 lambdas = [0.01, 0.1]
 
 alphas_num = [None] * len(deltas) * len(lambdas)
@@ -74,7 +92,9 @@ final_errors_mean = [None] * len(deltas) * len(lambdas)
 final_errors_std = [None] * len(deltas) * len(lambdas)
 
 for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-    for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
+    for jdx, (delta_small, delta_large) in enumerate(
+        tqdm(deltas, desc="delta", leave=False)
+    ):
         i = idx * len(deltas) + jdx
 
         file_path = os.path.join(
@@ -87,7 +107,8 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 alpha_points_num,
                 d,
                 reps,
-                delta,
+                delta_small,
+                delta_large,
                 l,
                 experiments=True,
             ),
@@ -102,7 +123,7 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 final_errors_std[i],
             ) = num.generate_different_alpha(
                 num.find_coefficients_ridge,
-                delta=delta,
+                delta=delta_small,
                 alpha_1=alpha_min,
                 alpha_2=alpha_max,
                 n_features=d,
@@ -128,7 +149,9 @@ alphas_theory = [None] * len(deltas) * len(lambdas)
 errors_theory = [None] * len(deltas) * len(lambdas)
 
 for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-    for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
+    for jdx, (delta_small, delta_large) in enumerate(
+        tqdm(deltas, desc="delta", leave=False)
+    ):
         i = idx * len(deltas) + jdx
 
         file_path = os.path.join(
@@ -138,10 +161,11 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 eps,
                 alpha_min,
                 alpha_max,
-                alpha_points_num,
+                alpha_points_theory,
                 d,
                 reps,
-                delta,
+                delta_small,
+                delta_large,
                 l,
                 experiments=False,
             ),
@@ -154,7 +178,7 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 m = np.random.random()
                 q = np.random.random()
                 sigma = np.random.random()
-                if np.square(m) < q + delta * q:
+                if np.square(m) < q + delta_small * q:
                     break
 
             initial = [m, q, sigma]
@@ -169,7 +193,7 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 alpha_2=alpha_max,
                 n_alpha_points=alpha_points_theory,
                 lambd=l,
-                delta=delta,
+                delta=delta_small,
                 initial_cond=initial,
                 verbose=True,
             )

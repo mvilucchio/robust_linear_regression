@@ -238,6 +238,8 @@ def sigma_integral_Huber(y, xi, q, m, sigma, delta):
 
 # -------------------
 
+# -------------------
+
 
 def q_hat_equation_BO(m, q, sigma, delta):
     borders = find_integration_borders(
@@ -251,6 +253,9 @@ def q_hat_equation_BO(m, q, sigma, delta):
         borders[1][1],
         args=(q, m, sigma, delta),
     )[0]
+
+
+# -------------------
 
 
 def m_hat_equation_L2(m, q, sigma, delta):
@@ -299,12 +304,18 @@ def sigma_hat_equation_L2(m, q, sigma, delta):
     )[0]
 
 
+# -------------------
+
+
 def border_plus_L1(xi, m, q, sigma, delta):
     return
 
 
 def border_minus_L1(xi, m, q, sigma, delta):
     return
+
+
+# -------------------
 
 
 def border_plus(xi, m, q, sigma, delta, a=A_HUBER):
@@ -460,6 +471,9 @@ def integral_fpe(
     return integral_value
 
 
+# -------------------
+
+
 def m_hat_equation_L1(m, q, sigma, delta):
     borders = find_integration_borders(
         lambda y, xi: m_integral_L1(y, xi, q, m, sigma, delta), np.sqrt((1 + delta)), 1.0
@@ -553,6 +567,9 @@ def sigma_hat_equation_L1(m, q, sigma, delta):
         args=(q, m, sigma, delta),
     )[0]
     return first_integral + second_integral + third_integral
+
+
+# -------------------
 
 
 def m_hat_equation_Huber(m, q, sigma, delta, a=A_HUBER):

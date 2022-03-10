@@ -48,8 +48,7 @@ def projection_ridge_different_alpha_theory(
 ):
 
     alphas = np.logspace(
-        np.log(alpha_1) / np.log(10), np.log(alpha_2) /
-        np.log(10), n_alpha_points
+        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
     )
 
     initial = initial_cond
@@ -70,13 +69,16 @@ def var_func_BO(m_hat, q_hat, sigma_hat, alpha, delta, lambd):
     q = q_hat / (1 + q_hat)
     return q, q, 1 - q
 
+
 def var_hat_func_BO(m, q, sigma, alpha, delta):
     q_hat = alpha / (1 + delta - q)
     return q_hat, q_hat, q_hat
 
+
 def var_hat_func_BO_num(m, q, sigma, alpha, delta):
     q_hat = alpha * numfun.q_hat_equation_BO(m, q, sigma, delta)
     return q_hat, q_hat, q_hat
+
 
 def var_func_L2(m_hat, q_hat, sigma_hat, alpha, delta, lambd):
     m = m_hat / (sigma_hat + lambd)
@@ -108,26 +110,80 @@ def var_hat_func_L1_num(m, q, sigma, alpha, delta):
 
 def var_hat_func_Huber_num(m, q, sigma, alpha, delta):
     if sigma + 1 >= 0:
-        m_hat = alpha * numfun.integral_fpe(numfun.m_integral_Huber, numfun.border_plus,
-                                            numfun.border_minus, numfun.test_fun_upper, m, q, sigma, delta)
-        q_hat = alpha * numfun.integral_fpe(numfun.q_integral_Huber, numfun.border_plus,
-                                            numfun.border_minus, numfun.test_fun_upper, m, q, sigma, delta)
-        sigma_hat = -alpha * numfun.integral_fpe(numfun.sigma_integral_Huber, numfun.border_plus,
-                                                 numfun.border_minus, numfun.test_fun_upper, m, q, sigma, delta)
+        m_hat = alpha * numfun.integral_fpe(
+            numfun.m_integral_Huber,
+            numfun.border_plus,
+            numfun.border_minus,
+            numfun.test_fun_upper,
+            m,
+            q,
+            sigma,
+            delta,
+        )
+        q_hat = alpha * numfun.integral_fpe(
+            numfun.q_integral_Huber,
+            numfun.border_plus,
+            numfun.border_minus,
+            numfun.test_fun_upper,
+            m,
+            q,
+            sigma,
+            delta,
+        )
+        sigma_hat = -alpha * numfun.integral_fpe(
+            numfun.sigma_integral_Huber,
+            numfun.border_plus,
+            numfun.border_minus,
+            numfun.test_fun_upper,
+            m,
+            q,
+            sigma,
+            delta,
+        )
     else:
-        m_hat = alpha * numfun.integral_fpe(numfun.m_integral_Huber, numfun.border_minus,
-                                            numfun.border_plus, numfun.test_fun_down, m, q, sigma, delta)
-        q_hat = alpha * numfun.integral_fpe(numfun.q_integral_Huber, numfun.border_minus,
-                                            numfun.border_plus, numfun.test_fun_down, m, q, sigma, delta)
-        sigma_hat = -alpha * numfun.integral_fpe(numfun.sigma_integral_Huber, numfun.border_minus,
-                                                 numfun.border_plus, numfun.test_fun_down, m, q, sigma, delta)
+        m_hat = alpha * numfun.integral_fpe(
+            numfun.m_integral_Huber,
+            numfun.border_minus,
+            numfun.border_plus,
+            numfun.test_fun_down,
+            m,
+            q,
+            sigma,
+            delta,
+        )
+        q_hat = alpha * numfun.integral_fpe(
+            numfun.q_integral_Huber,
+            numfun.border_minus,
+            numfun.border_plus,
+            numfun.test_fun_down,
+            m,
+            q,
+            sigma,
+            delta,
+        )
+        sigma_hat = -alpha * numfun.integral_fpe(
+            numfun.sigma_integral_Huber,
+            numfun.border_minus,
+            numfun.border_plus,
+            numfun.test_fun_down,
+            m,
+            q,
+            sigma,
+            delta,
+        )
     return m_hat, q_hat, sigma_hat
 
 
 def var_hat_func_L2_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps=0.1):
-    m_hat = alpha * numfuneps.m_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps)
-    q_hat = alpha * numfuneps.q_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps)
-    sigma_hat = -alpha * numfuneps.sigma_hat_equation_L2_eps(m, q, sigma, delta_small, delta_large, eps)
+    m_hat = alpha * numfuneps.m_hat_equation_L2_eps(
+        m, q, sigma, delta_small, delta_large, eps
+    )
+    q_hat = alpha * numfuneps.q_hat_equation_L2_eps(
+        m, q, sigma, delta_small, delta_large, eps
+    )
+    sigma_hat = -alpha * numfuneps.sigma_hat_equation_L2_eps(
+        m, q, sigma, delta_small, delta_large, eps
+    )
     return m_hat, q_hat, sigma_hat
 
 
@@ -165,8 +221,8 @@ if __name__ == "__main__":
             i = idx * len(deltas) + jdx
 
             alphas_int[i], errors_int[i] = projection_ridge_different_alpha_theory(
-                var_func_L2,
-                var_hat_func_L2_num,
+                var_func_BO,
+                var_hat_func_BO_num,
                 alpha_1=alpha_min,
                 alpha_2=alpha_max,
                 n_alpha_points=alpha_points_int,
@@ -210,7 +266,7 @@ if __name__ == "__main__":
             ax.plot(
                 alphas_int[i],
                 errors_int[i],
-                marker='.',
+                marker=".",
                 label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
                 color=colormap(i),
             )
