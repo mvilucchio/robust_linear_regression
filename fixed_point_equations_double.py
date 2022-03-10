@@ -1,12 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import norm
-import scipy.stats as stats
 from tqdm.auto import tqdm
-import numerical_functions as numfun
 import numerical_function_double as numfuneps
-import os
 from src.utils import file_name_generator
+import os
 
 
 theory_path = "./data/theory"
@@ -51,7 +48,7 @@ def state_equations(
     blend = 0.5
     while err > 1e-6:
         m_hat, q_hat, sigma_hat = var_hat_func(
-            m, q, sigma, alpha, delta_small, delta_large, eps=eps
+            m, q, sigma, alpha, delta_small, delta_large, eps
         )
 
         temp_m, temp_q, temp_sigma = m, q, sigma
@@ -91,14 +88,11 @@ def projection_ridge_different_alpha_theory(
     alphas = np.logspace(
         np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
     )
-
-    initial = initial_cond
     error_theory = np.zeros(n_alpha_points)
 
     for i, alpha in enumerate(
         tqdm(alphas, desc="alpha", disable=not verbose, leave=False)
     ):
-        # print(alpha)
         m, q, _ = state_equations(
             var_func,
             var_hat_func,
@@ -107,7 +101,7 @@ def projection_ridge_different_alpha_theory(
             lambd=lambd,
             alpha=alpha,
             eps=eps,
-            init=initial,
+            init=initial_cond,
         )
         error_theory[i] = 1 + q - 2 * m
 
@@ -119,9 +113,9 @@ def var_func_BO(m_hat, q_hat, sigma_hat, alpha, delta_small, delta_large, lambd)
     return q, q, 1 - q
 
 
-def var_hat_func_BO_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps=0.1):
+def var_hat_func_BO_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps):
     q_hat = alpha * numfuneps.q_hat_equation_BO_eps(
-        m, q, sigma, delta_small, delta_large, eps=eps
+        m, q, sigma, delta_small, delta_large, eps
     )
     return q_hat, q_hat, q_hat
 
@@ -133,7 +127,7 @@ def var_func_L2(m_hat, q_hat, sigma_hat, alpha, delta_small, delta_large, lambd)
     return m, q, sigma
 
 
-def var_hat_func_L2_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps=0.1):
+def var_hat_func_L2_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps):
     m_hat = alpha * numfuneps.m_hat_equation_L2_eps(
         m, q, sigma, delta_small, delta_large, eps=eps
     )
@@ -146,24 +140,7 @@ def var_hat_func_L2_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps=0.
     return m_hat, q_hat, sigma_hat
 
 
-# def var_hat_func_Huber_num_eps(
-#     m, q, sigma, alpha, delta_small, delta_large, eps=0.1, a=1.0
-# ):
-#     m_hat = alpha * numfuneps.m_hat_equation_Huber_eps(
-#         m, q, sigma, delta_small, delta_large, eps=eps, a=a
-#     )
-#     q_hat = alpha * numfuneps.q_hat_equation_Huber_eps(
-#         m, q, sigma, delta_small, delta_large, eps=eps, a=a
-#     )
-#     sigma_hat = -alpha * numfuneps.sigma_hat_equation_Huber_eps(
-#         m, q, sigma, delta_small, delta_large, eps=eps, a=a
-#     )
-#     return m_hat, q_hat, sigma_hat
-
-
-def var_hat_func_Huber_num_eps(
-    m, q, sigma, alpha, delta_small, delta_large, eps=0.1, a=1.0
-):
+def var_hat_func_Huber_num_eps(m, q, sigma, alpha, delta_small, delta_large, eps, a=1.0):
     m_hat = alpha * numfuneps.integral_fpe(
         numfuneps.m_integral_Huber_eps,
         numfuneps.border_plus_Huber,
@@ -175,6 +152,7 @@ def var_hat_func_Huber_num_eps(
         delta_small,
         delta_large,
         eps,
+        a,
     )
     q_hat = alpha * numfuneps.integral_fpe(
         numfuneps.q_integral_Huber_eps,
@@ -187,6 +165,7 @@ def var_hat_func_Huber_num_eps(
         delta_small,
         delta_large,
         eps,
+        a,
     )
     sigma_hat = -alpha * numfuneps.integral_fpe(
         numfuneps.sigma_integral_Huber_eps,
@@ -199,17 +178,18 @@ def var_hat_func_Huber_num_eps(
         delta_small,
         delta_large,
         eps,
+        a,
     )
     return m_hat, q_hat, sigma_hat
 
 
 if __name__ == "__main__":
-    loss_name = "Huber"
+    loss_name = "BO"
     alpha_min, alpha_max = 0.01, 100
     eps = 0.1
     alpha_points = 15
-    deltas = [[1.0, 2.0], [1.0, 5.0], [1.0, 10.0]]  #
-    lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]  #
+    deltas = [[0.1, 3.0], [0.5, 1.5], [1.0, 2.0], [1.0, 5.0], [1.0, 10.0]]  #
+    lambdas = [0.01]  # , 0.1, 1.0, 10.0, 100.0
 
     random_number = np.random.randint(0, 100)
 
@@ -235,7 +215,7 @@ if __name__ == "__main__":
                     delta_small,
                     delta_large=delta_large,
                     eps=eps,
-                    experiment=False,
+                    experiment_type="BO",
                 ),
             )
 
@@ -257,8 +237,8 @@ if __name__ == "__main__":
                 initial = [m, q, sigma]
 
                 alphas[i], errors[i] = projection_ridge_different_alpha_theory(
-                    var_func_L2,
-                    var_hat_func_Huber_num_eps,
+                    var_func_BO,
+                    var_hat_func_BO_num_eps,
                     alpha_1=alpha_min,
                     alpha_2=alpha_max,
                     n_alpha_points=alpha_points,

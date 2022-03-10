@@ -1,22 +1,15 @@
-from tqdm.auto import tqdm
-
-# from cv2 import integral
 import numpy as np
-import matplotlib.pyplot as plt
-import scipy as sc
 from tqdm.auto import tqdm
-from scipy.integrate import dblquad, quad
-import fixed_point_equations as fpe
-import numba as nb
-import numerical_functions as numfun
+from scipy.integrate import dblquad
+from numba import njit, vectorize
 import fixed_point_equations_double as fpedb
 
-MULT_INTEGRAL = 5
+MULT_INTEGRAL = 10
 A_HUBER = 1.0
 EPS = 0.1
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def ZoutBayes_eps(y, omega, V, delta_small, delta_large, eps):
     return (1 - eps) * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small))) / np.sqrt(
         2 * np.pi * (V + delta_small)
@@ -25,45 +18,39 @@ def ZoutBayes_eps(y, omega, V, delta_small, delta_large, eps):
     )
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def foutBayes_eps(y, omega, V, delta_small, delta_large, eps):
+    small_exponential = np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
+    large_exponential = np.exp(-((y - omega) ** 2) / (2 * (V + delta_large)))
     return (
         (y - omega)
         * (
-            (1 - eps)
-            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
-            / np.power(V + delta_small, 3 / 2)
-            + eps
-            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_large)))
-            / np.power(V + delta_large, 3 / 2)
+            (1 - eps) * small_exponential / np.power(V + delta_small, 3 / 2)
+            + eps * large_exponential / np.power(V + delta_large, 3 / 2)
         )
         / (
-            (1 - eps)
-            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
-            / np.power(V + delta_small, 1 / 2)
-            + eps
-            * np.exp(-((y - omega) ** 2) / (2 * (V + delta_large)))
-            / np.power(V + delta_large, 1 / 2)
+            (1 - eps) * small_exponential / np.power(V + delta_small, 1 / 2)
+            + eps * large_exponential / np.power(V + delta_large, 1 / 2)
         )
     )
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def foutL2(y, omega, V):
     return (y - omega) / (1 + V)
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def DfoutL2(y, omega, V):
     return -1.0 / (1 + V)
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def foutL1(y, omega, V):
     return (y - omega + np.sign(omega - y) * np.maximum(np.abs(omega - y) - V, 0.0)) / V
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def DfoutL1(y, omega, V):
     if np.abs(omega - y) > V:
         return 0.0
@@ -71,8 +58,9 @@ def DfoutL1(y, omega, V):
         return -1.0 / V
 
 
-@nb.njit(error_model="numpy", fastmath=True)
-def foutHuber(y, omega, V, a=A_HUBER):
+# @njit(error_model="numpy", fastmath=True)
+@vectorize
+def foutHuber(y, omega, V, a):
     if a + a * V + omega < y:
         return a
     elif np.abs(y - omega) <= a + a * V:
@@ -83,8 +71,9 @@ def foutHuber(y, omega, V, a=A_HUBER):
         return 0.0
 
 
-@nb.njit(error_model="numpy", fastmath=True)
-def DfoutHuber(y, omega, V, a=A_HUBER):
+# @njit(error_model="numpy", fastmath=True)
+@vectorize
+def DfoutHuber(y, omega, V, a):
     if (y < omega and a + a * V + y < omega) or (a + a * V + omega < y):
         return 0.0
     else:
@@ -146,20 +135,20 @@ def find_integration_borders(
 # -----
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def q_integral_BO_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
-        * ZoutBayes_eps(y, np.sqrt(q) * xi, 1 - q, delta_small, delta_large, eps)
-        * (foutBayes_eps(y, np.sqrt(q) * xi, 1 - q, delta_small, delta_large, eps) ** 2)
+        * ZoutBayes_eps(y, np.sqrt(q) * xi, (1 - q), delta_small, delta_large, eps)
+        * (foutBayes_eps(y, np.sqrt(q) * xi, (1 - q), delta_small, delta_large, eps) ** 2)
     )
 
 
 # -----
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def m_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
     eta = m ** 2 / q
     return (
@@ -171,7 +160,7 @@ def m_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
     )
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def q_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
     eta = m ** 2 / q
     return (
@@ -182,7 +171,7 @@ def q_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
     )
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def sigma_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
     eta = m ** 2 / q
     return (
@@ -196,50 +185,44 @@ def sigma_integral_L2_eps(y, xi, q, m, sigma, delta_small, delta_large, eps):
 # -----
 
 
-@nb.njit(error_model="numpy", fastmath=True)
-def m_integral_Huber_eps(
-    y, xi, q, m, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER
-):
+@njit(error_model="numpy", fastmath=True)
+def m_integral_Huber_eps(y, xi, q, m, sigma, delta_small, delta_large, eps, a):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
         * ZoutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
         * foutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
-        * foutHuber(y, np.sqrt(q) * xi, sigma, a=a)
+        * foutHuber(y, np.sqrt(q) * xi, sigma, a)
     )
 
 
-@nb.njit(error_model="numpy", fastmath=True)
-def q_integral_Huber_eps(
-    y, xi, q, m, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER
-):
+@njit(error_model="numpy", fastmath=True)
+def q_integral_Huber_eps(y, xi, q, m, sigma, delta_small, delta_large, eps, a):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
         * ZoutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
-        * (foutHuber(y, np.sqrt(q) * xi, sigma, a=a) ** 2)
+        * (foutHuber(y, np.sqrt(q) * xi, sigma, a) ** 2)
     )
 
 
-@nb.njit(error_model="numpy", fastmath=True)
-def sigma_integral_Huber_eps(
-    y, xi, q, m, sigma, delta_small, delta_large, eps=EPS, a=A_HUBER
-):
+@njit(error_model="numpy", fastmath=True)
+def sigma_integral_Huber_eps(y, xi, q, m, sigma, delta_small, delta_large, eps, a):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
         * ZoutBayes_eps(y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps)
-        * DfoutHuber(y, np.sqrt(q) * xi, sigma, a=a)
+        * DfoutHuber(y, np.sqrt(q) * xi, sigma, a)
     )
 
 
 # -----
 
 
-def q_hat_equation_BO_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
+def q_hat_equation_BO_eps(m, q, sigma, delta_small, delta_large, eps):
     borders = find_integration_borders(
         lambda y, xi: q_integral_BO_eps(
             y, xi, q, m, sigma, delta_small, delta_large, eps
@@ -247,14 +230,52 @@ def q_hat_equation_BO_eps(m, q, sigma, delta_small, delta_large, eps=EPS):
         np.sqrt((1 + delta_small)),
         1.0,
     )
-    return dblquad(
-        q_integral_BO_eps,
-        borders[0][0],
-        borders[0][1],
-        borders[1][0],
-        borders[1][1],
-        args=(q, m, sigma, delta_small, delta_large, eps),
-    )[0]
+
+    max_range = borders[0][1]
+    mid_range = 0.3 * max_range
+
+    domain_xi = [
+        [-mid_range, mid_range],
+        [-mid_range, mid_range],
+        [mid_range, max_range],
+        [mid_range, max_range],
+        [mid_range, max_range],
+        [-mid_range, mid_range],
+        [-max_range, -mid_range],
+        [-max_range, -mid_range],
+        [-max_range, -mid_range],
+    ]
+
+    domain_y = [
+        [lambda xi: -mid_range, lambda xi: mid_range],
+        [lambda xi: mid_range, lambda xi: max_range],
+        [lambda xi: mid_range, lambda xi: max_range],
+        [lambda xi: -mid_range, lambda xi: mid_range],
+        [lambda xi: -max_range, lambda xi: -mid_range],
+        [lambda xi: -max_range, lambda xi: -mid_range],
+        [lambda xi: -max_range, lambda xi: -mid_range],
+        [lambda xi: -mid_range, lambda xi: mid_range],
+        [lambda xi: mid_range, lambda xi: max_range],
+    ]
+
+    integral_value = 0.0
+    for xi_funs, y_funs in zip(domain_xi, domain_y):
+        integral_value += dblquad(
+            q_integral_BO_eps,
+            xi_funs[0],
+            xi_funs[1],
+            y_funs[0],
+            y_funs[1],
+            args=(q, m, sigma, delta_small, delta_large, eps),
+        )[0]
+
+    print(
+        "max_range : {:.6f} min_range : {:.6f} integral_value : {:.6f}".format(
+            max_range, mid_range, integral_value
+        )
+    )
+
+    return integral_value
 
 
 # -----
@@ -344,11 +365,10 @@ def integral_fpe(
     delta_small,
     delta_large,
     eps=EPS,
+    a=A_HUBER,
 ):
     borders = find_integration_borders(
-        lambda y, xi: integral_form(
-            y, xi, q, m, sigma, delta_small, delta_large, eps=EPS
-        ),
+        lambda y, xi: integral_form(y, xi, q, m, sigma, delta_small, delta_large, eps, a),
         np.sqrt(1 + delta_small),
         1.0,
     )
@@ -420,7 +440,7 @@ def integral_fpe(
     elif xi_test > -max_val:
         xi_test_2 = test_function(-max_val, m, q, sigma)
         if xi_test_2 < -max_val:
-            # print("case 3.A")
+            #  print("case 3.A")
             domain_xi = [
                 [-max_val, xi_test],
                 [-xi_test, max_val],
@@ -436,7 +456,7 @@ def integral_fpe(
                 [lambda xi: -max_val, lambda xi: max_val],
             ]
         else:
-            # print("case 3.B")
+            #  print("case 3.B")
             domain_xi = [
                 [xi_test_2, xi_test],
                 [-xi_test, -xi_test_2],
@@ -468,7 +488,7 @@ def integral_fpe(
             xi_funs[1],
             y_funs[0],
             y_funs[1],
-            args=(q, m, sigma, delta_small, delta_large, eps),
+            args=(q, m, sigma, delta_small, delta_large, eps, a),
         )[0]
     return integral_value
 
@@ -723,7 +743,7 @@ def state_equations_convergence(
 
 if __name__ == "__main__":
     # test the convergence
-    alpha = 0.05
+    alpha = 10
     deltas = [[0.5, 1.5]]
     lambdas = [1.0]
 
@@ -746,8 +766,8 @@ if __name__ == "__main__":
             initial = [m, q, sigma]
 
             _, _, _ = state_equations_convergence(
-                fpedb.var_func_L2,
-                fpedb.var_hat_func_Huber_num_eps,
+                fpedb.var_func_BO,
+                fpedb.var_hat_func_BO_num_eps,
                 delta_small=delta_small,
                 delta_large=delta_large,
                 lambd=l,
