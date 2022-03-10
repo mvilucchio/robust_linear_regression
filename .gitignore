@@ -1,6 +1,8 @@
 # OS Dependant
 .DS_Store
 
+imgs/*
+
 # Data files
 *.npz
 
