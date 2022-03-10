@@ -22,7 +22,6 @@ REG_EXPS = [
     "(theory)",
     "(BO|Bayes[ ]{0,1}Optimal)",
     "((reg[\_\s]{0,1}param|lambda)[\_\s]{0,1}optimal)",
-    #  ".*",
 ]
 
 SINGLE_NOISE_NAMES = [
@@ -41,154 +40,7 @@ DOUBLE_NOISE_NAMES = [
     "{loss_name} double noise - eps {epsilon} - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}] - lambda {reg_param}",
 ]
 
-
-def experiments_name(
-    loss_name,
-    alpha_min,
-    alpha_max,
-    alpha_points,
-    dim,
-    reps,
-    reg_param,
-    delta_small,
-    delta_large=0.0,
-    eps=0.0,
-) -> str:
-    if float(eps) == 0.0:
-        return SINGLE_NOISE_NAMES[0].format(
-            loss_name,
-            alpha_min,
-            alpha_max,
-            alpha_points,
-            dim,
-            reps,
-            delta_small,
-            reg_param,
-        )
-    else:
-        return DOUBLE_NOISE_NAMES[0].format(
-            loss_name,
-            eps,
-            alpha_min,
-            alpha_max,
-            alpha_points,
-            dim,
-            reps,
-            delta_small,
-            delta_large,
-            reg_param,
-        )
-
-
-def theory_name(
-    loss_name,
-    alpha_min,
-    alpha_max,
-    alpha_points,
-    dim,
-    reps,
-    reg_param,
-    delta_small,
-    delta_large=0.0,
-    eps=0.0,
-) -> str:
-    if float(eps) == 0.0:
-        return SINGLE_NOISE_NAMES[1].format(
-            loss_name, alpha_min, alpha_max, alpha_points, delta_small, reg_param,
-        )
-    else:
-        return DOUBLE_NOISE_NAMES[1].format(
-            loss_name,
-            eps,
-            alpha_min,
-            alpha_max,
-            alpha_points,
-            delta_small,
-            delta_large,
-            reg_param,
-        )
-
-
-def bayes_optimal_name(
-    loss_name,
-    alpha_min,
-    alpha_max,
-    alpha_points,
-    dim,
-    reps,
-    reg_param,
-    delta_small,
-    delta_large=0.0,
-    eps=0.0,
-) -> str:
-    if float(eps) == 0.0:
-        return SINGLE_NOISE_NAMES[2].format(
-            alpha_min, alpha_max, alpha_points, delta_small,
-        )
-    else:
-        return DOUBLE_NOISE_NAMES[2].format(
-            eps, alpha_min, alpha_max, alpha_points, delta_small, delta_large,
-        )
-
-
-def reg_param_optimal_name(
-    loss_name,
-    alpha_min,
-    alpha_max,
-    alpha_points,
-    dim,
-    reps,
-    reg_param,
-    delta_small,
-    delta_large=0.0,
-    eps=0.0,
-) -> str:
-    if float(eps) == 0.0:
-        return SINGLE_NOISE_NAMES[3].format(
-            loss_name, alpha_min, alpha_max, alpha_points, delta_small,
-        )
-    else:
-        return DOUBLE_NOISE_NAMES[3].format(
-            loss_name, eps, alpha_min, alpha_max, alpha_points, delta_small, delta_large
-        )
-
-
-def other_name(
-    loss_name,
-    alpha_min,
-    alpha_max,
-    alpha_points,
-    dim,
-    reps,
-    reg_param,
-    delta_small,
-    delta_large=0.0,
-    eps=0.0,
-) -> str:
-    if float(eps) == 0.0:
-        return SINGLE_NOISE_NAMES[-1].format(
-            loss_name, alpha_min, alpha_max, alpha_points, delta_small, reg_param,
-        )
-    else:
-        return DOUBLE_NOISE_NAMES[-1].format(
-            loss_name,
-            eps,
-            alpha_min,
-            alpha_max,
-            alpha_points,
-            delta_small,
-            delta_large,
-            reg_param,
-        )
-
-
-FUN_STRING_FORMATTER = [
-    experiments_name,
-    theory_name,
-    bayes_optimal_name,
-    reg_param_optimal_name,
-    other_name,
-]
+# ------------
 
 
 def find_integration_borders_square(
@@ -297,35 +149,6 @@ def _exp_type_choser(test_string, values=[0, 1, 2, 3, -1]):
     return values[-1]
 
 
-def file_name_generator_2(
-    loss_name,
-    alpha_min,
-    alpha_max,
-    alpha_points,
-    dim,
-    reps,
-    reg_param,
-    delta_small,
-    delta_large=0.0,
-    eps=0.0,
-    experiment_type="theory",
-):
-    experiment_case = _exp_type_choser(experiment_type)
-
-    return FUN_STRING_FORMATTER[experiment_case](
-        loss_name,
-        alpha_min,
-        alpha_max,
-        alpha_points,
-        dim,
-        reps,
-        reg_param,
-        delta_small,
-        delta_large=delta_large,
-        eps=eps,
-    )
-
-
 def file_name_generator(**kwargs):
     experiment_code = _exp_type_choser(kwargs["experiment_type"])
     if float(kwargs.get("epsilon", 0.0)) == 0.0:
@@ -346,49 +169,6 @@ def create_check_folders():
             os.makedirs(folder_path)
 
 
-def check_saved_2(
-    loss_name,
-    alpha_min,
-    alpha_max,
-    alpha_points,
-    dim,
-    reps,
-    reg_param,
-    delta_small,
-    delta_large=0.0,
-    eps=0.0,
-    experiment_type="theory",
-):
-    create_check_folders()
-
-    experiment_code = _exp_type_choser(experiment_type)
-    folder_path = FOLDER_PATHS[experiment_code]
-
-    file_path = os.path.join(
-        folder_path,
-        file_name_generator(
-            loss_name,
-            alpha_min,
-            alpha_max,
-            alpha_points,
-            dim,
-            reps,
-            reg_param,
-            delta_small,
-            delta_large=delta_large,
-            eps=eps,
-            experiment_type=experiment_type,
-        ),
-    )
-
-    file_exists = os.path.exists(file_path + ".npz")
-
-    if file_exists:
-        return file_exists, (file_path + ".npz")
-    else:
-        return file_exists, file_path
-
-
 def check_saved(**kwargs):
     create_check_folders()
 
@@ -405,21 +185,62 @@ def check_saved(**kwargs):
         return file_exists, file_path
 
 
-def save_file(file_path=None, **kwargs):
+def save_file(**kwargs):
     file_path = kwargs.get("file_path")
-
-    if file_path is None:
-        return NotImplementedError
 
     experiment_code = _exp_type_choser(kwargs["experiment_type"])
 
+    if file_path is None:
+        file_path = os.path.join(
+            FOLDER_PATHS[experiment_code], file_name_generator(**kwargs)
+        )
+
     if experiment_code == 0:
-        np.savez()
-    elif experiment_code == 1:
-        np.savez()
-    elif experiment_code == 2:
-        np.savez()
+        np.savez(
+            file_path,
+            alphas=kwargs["alphas"],
+            errors_mean=kwargs["errors_mean"],
+            errors_std=kwargs["errors_std"],
+        )
+    elif experiment_code == 1 or experiment_code == 2:
+        np.savez(file_path, alphas=kwargs["alphas"], errors=kwargs["errors"])
     elif experiment_code == 3:
-        np.savez()
+        np.savez(
+            file_path,
+            alphas=kwargs["alphas"],
+            errors=kwargs["errors"],
+            lambdas=kwargs["lambdas"],
+        )
     else:
         raise ValueError("experiment_type not recognized.")
+
+
+def load_file(**kwargs):
+    file_path = kwargs.get("file_path")
+
+    experiment_code = _exp_type_choser(kwargs["experiment_type"])
+
+    if file_path is None:
+        file_path = os.path.join(
+            FOLDER_PATHS[experiment_code], file_name_generator(**kwargs) + ".npz"
+        )
+
+    saved_data = np.load(file_path)
+
+    if experiment_code == 0:
+        alphas = saved_data["alphas"]
+        errors_mean = saved_data["errors_mean"]
+        errors_std = saved_data["errors_std"]
+        return alphas, errors_mean, errors_std
+    elif experiment_code == 1 or experiment_code == 2:
+        alphas = saved_data["alphas"]
+        errors = saved_data["errors"]
+        return alphas, errors
+    elif experiment_code == 3:
+        alphas = saved_data["alphas"]
+        errors = (kwargs["errors"],)
+        lambdas = (kwargs["lambdas"],)
+        return alphas, errors, lambdas
+    else:
+        raise ValueError("experiment_type not recognized.")
+
