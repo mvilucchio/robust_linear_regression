@@ -1,9 +1,6 @@
-# from cv2 import integral
 import numpy as np
-import matplotlib.pyplot as plt
-import scipy as sc
 from tqdm.auto import tqdm
-from scipy.integrate import dblquad, quad
+from scipy.integrate import dblquad
 import fixed_point_equations as fpe
 import numba as nb
 
