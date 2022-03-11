@@ -202,10 +202,6 @@ if __name__ == "__main__":
 
     colormap = get_cmap(len(lambdas) * len(deltas) + 1)
 
-    # m = 0.05 * np.random.random() + 0.45
-    # q = 0.02 * np.random.random() + 0.01
-    # sigma = 0.1 * np.random.random() + 0.05
-
     for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
         for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
             while True:
@@ -232,32 +228,6 @@ if __name__ == "__main__":
                 verbose=True,
             )
 
-    # for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-    #     for jdx, delta in enumerate(tqdm(deltas, desc="delta", leave=False)):
-    #         while True:
-    #             m = np.random.random()
-    #             q = np.random.random()
-    #             sigma = np.random.random()
-    #             if np.square(m) < q + delta * q:
-    #                 break
-
-    #         initial = [m, q, sigma]
-
-    #         i = idx * len(deltas) + jdx
-
-    #         alphas_an[i], errors_an[i] = projection_ridge_different_alpha_theory(
-    #             var_func_L2,
-    #             var_hat_func_L2,
-    #             alpha_1 = alpha_min,
-    #             alpha_2 = alpha_max,
-    #             n_alpha_points = alpha_points_an,
-    #             lambd = l,
-    #             delta = delta,
-    #             initial_cond = initial,
-    #             verbose = True
-    #         )
-    #         # print(initial)
-
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
     for idx, l in enumerate(lambdas):
@@ -270,12 +240,6 @@ if __name__ == "__main__":
                 label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
                 color=colormap(i),
             )
-            # ax.plot(
-            #     alphas_an[i],
-            #     errors_an[i],
-            #     # label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
-            #     color = colormap(i)
-            # )
 
     ax.set_title("Huber Loss")
     ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")

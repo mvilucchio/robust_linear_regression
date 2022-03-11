@@ -269,12 +269,6 @@ def q_hat_equation_BO_eps(m, q, sigma, delta_small, delta_large, eps):
             args=(q, m, sigma, delta_small, delta_large, eps),
         )[0]
 
-    print(
-        "max_range : {:.6f} min_range : {:.6f} integral_value : {:.6f}".format(
-            max_range, mid_range, integral_value
-        )
-    )
-
     return integral_value
 
 

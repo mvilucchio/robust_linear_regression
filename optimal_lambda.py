@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from tqdm.auto import tqdm
 import fixed_point_equations_double as fixedpoint
-from src.utils import check_saved
+from src.utils import check_saved, load_file, save_file
 
 
 def optimal_lambda(
@@ -72,19 +72,18 @@ if __name__ == "__main__":
         ):
             i = idx * len(deltas) + jdx
 
-            file_exists, file_path = check_saved(
-                "Huber",
-                alpha_min,
-                alpha_max,
-                alpha_points,
-                10,
-                10,
-                0.0,
-                delta_small,
-                delta_large=delta_large,
-                eps=e,
-                experiment_type="reg param optimal",
-            )
+            experiment_dict = {
+                "loss_name": "Huber",
+                "alpha_min": alpha_min,
+                "alpha_max": alpha_max,
+                "alpha_pts": alpha_points,
+                "delta_small": delta_small,
+                "delta_large": delta_large,
+                "epsilon": e,
+                "experiment_type": "reg param optimal",
+            }
+
+            file_exists, file_path = check_saved(**experiment_dict)
 
             if not file_exists:
 
@@ -113,15 +112,20 @@ if __name__ == "__main__":
                     verbose=True,
                 )
 
-                np.savez(
-                    file_path, alphas=alphas[i], errors=errors[i], lambdas=lambdas[i],
+                experiment_dict.update(
+                    {
+                        "file_path": file_path,
+                        "alphas": alphas[i],
+                        "errors": errors[i],
+                        "lambdas": lambdas[i],
+                    }
                 )
-            else:
-                data = np.load(file_path)
 
-                alphas[i] = data["alphas"]
-                errors[i] = data["errors"]
-                lambdas[i] = data["lambdas"]
+                save_file(**experiment_dict)
+            else:
+                experiment_dict.update({"file_path": file_path})
+
+                alphas[i], errors[i], lambdas[i] = load_file(**experiment_dict)
 
     alphas_L2 = [None] * len(deltas) * len(eps)
     errors_L2 = [None] * len(deltas) * len(eps)
@@ -135,19 +139,18 @@ if __name__ == "__main__":
         ):
             i = idx * len(deltas) + jdx
 
-            file_exists, file_path = check_saved(
-                "L2",
-                alpha_min,
-                alpha_max,
-                alpha_points,
-                10,
-                10,
-                0.0,
-                delta_small,
-                delta_large=delta_large,
-                eps=e,
-                experiment_type="reg param optimal",
-            )
+            experiment_dict = {
+                "loss_name": "L2",
+                "alpha_min": alpha_min,
+                "alpha_max": alpha_max,
+                "alpha_pts": alpha_points,
+                "delta_small": delta_small,
+                "delta_large": delta_large,
+                "epsilon": e,
+                "experiment_type": "reg param optimal",
+            }
+
+            file_exists, file_path = check_saved(**experiment_dict)
 
             if not file_exists:
 
@@ -176,18 +179,20 @@ if __name__ == "__main__":
                     verbose=True,
                 )
 
-                np.savez(
-                    file_path,
-                    alphas=alphas_L2[i],
-                    errors=errors_L2[i],
-                    lambdas=lambdas_L2[i],
+                experiment_dict.update(
+                    {
+                        "file_path": file_path,
+                        "alphas": alphas_L2[i],
+                        "errors": errors_L2[i],
+                        "lambdas": lambdas_L2[i],
+                    }
                 )
-            else:
-                data = np.load(file_path)
 
-                alphas_L2[i] = data["alphas"]
-                errors_L2[i] = data["errors"]
-                lambdas_L2[i] = data["lambdas"]
+                save_file(**experiment_dict)
+            else:
+                experiment_dict.update({"file_path": file_path})
+
+                alphas_L2[i], errors_L2[i], lambdas_L2[i] = load_file(**experiment_dict)
 
     # fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 

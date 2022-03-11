@@ -3,315 +3,394 @@ import matplotlib.pyplot as plt
 from optimal_lambda import optimal_lambda
 from tqdm.auto import tqdm
 import fixed_point_equations_double as fixedpoint
-import fixed_point_equations_bayes_opt as bofpe
-from src.utils import check_saved
+from src.utils import check_saved, save_file, load_file
 
 names_cm = ["Blues", "Reds", "Greens", "Oranges"]
 
-if __name__ == "__main__":
-    random_number = np.random.randint(0, 100)
+random_number = np.random.randint(0, 100)
 
-    alpha_min, alpha_max = 0.01, 100
-    eps = [0.01, 0.1, 0.3]
-    alpha_points = 21
-    deltas = [[0.5, 1.5], [1.0, 2.0], [1.0, 5.0]]
+alpha_min, alpha_max = 0.01, 100
+eps = [0.01, 0.1, 0.3]
+alpha_points = 21
+deltas = [
+    [1.0, 3.0],
+    [1.0, 4.0],
+    [0.5, 2.0],
+    [0.5, 3.0],
+    [0.5, 2.5],
+]
+# [0.5, 1.5], [1.0, 2.0], [1.0, 5.0]
 
-    alphas = [None] * len(deltas) * len(eps)
-    errors = [None] * len(deltas) * len(eps)
-    lambdas = [None] * len(deltas) * len(eps)
+alphas_Hub = [None] * len(deltas) * len(eps)
+errors_Hub = [None] * len(deltas) * len(eps)
+lambdas_Hub = [None] * len(deltas) * len(eps)
 
-    colormap = fixedpoint.get_cmap(len(eps) * len(deltas) + 1)
+colormap = fixedpoint.get_cmap(len(eps) * len(deltas) + 1)
 
-    # evaluates the lambda optimal for each value
-    print("-- Optimal reg_param Huber")
-    for idx, e in enumerate(tqdm(eps, desc="epsilon", leave=False)):
-        for jdx, (delta_small, delta_large) in enumerate(
-            tqdm(deltas, desc="delta", leave=False)
-        ):
-            i = idx * len(deltas) + jdx
+# evaluates the lambda optimal for each value
+print("-- Optimal reg_param Huber")
+for idx, e in enumerate(tqdm(eps, desc="epsilon", leave=False)):
+    for jdx, (delta_small, delta_large) in enumerate(
+        tqdm(deltas, desc="delta", leave=False)
+    ):
+        i = idx * len(deltas) + jdx
 
-            file_exists, file_path = check_saved(
-                loss_name="Huber",
-                alpha_min=alpha_min,
-                alpha_max=alpha_max,
-                alpha_pts=alpha_points,
+        experiment_dict = {
+            "loss_name": "Huber",
+            "alpha_min": alpha_min,
+            "alpha_max": alpha_max,
+            "alpha_pts": alpha_points,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "epsilon": e,
+            "experiment_type": "reg param optimal",
+        }
+
+        file_exists, file_path = check_saved(**experiment_dict)
+
+        if not file_exists:
+            while True:
+                m = 0.89 * np.random.random() + 0.1
+                q = 0.89 * np.random.random() + 0.1
+                sigma = np.random.random()
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
+                    break
+
+            initial = [m, q, sigma]
+
+            alphas_Hub[i], errors_Hub[i], lambdas_Hub[i] = optimal_lambda(
+                fixedpoint.var_func_L2,
+                fixedpoint.var_hat_func_Huber_num_eps,
+                alpha_1=alpha_min,
+                alpha_2=alpha_max,
+                n_alpha_points=alpha_points,
                 delta_small=delta_small,
                 delta_large=delta_large,
-                epsilon=e,
-                experiment_type="reg param optimal",
+                initial_cond=initial,
+                eps=e,
+                verbose=True,
             )
 
-            if not file_exists:
-                while True:
-                    m = 0.89 * np.random.random() + 0.1
-                    q = 0.89 * np.random.random() + 0.1
-                    sigma = np.random.random()
-                    if (
-                        np.square(m) < q + delta_small * q
-                        and np.square(m) < q + delta_large * q
-                    ):
-                        break
+            experiment_dict.update(
+                {
+                    "file_path": file_path,
+                    "alphas": alphas_Hub[i],
+                    "errors": errors_Hub[i],
+                    "lambdas": lambdas_Hub[i],
+                }
+            )
 
-                initial = [m, q, sigma]
+            save_file(**experiment_dict)
+        else:
+            experiment_dict.update({"file_path": file_path})
 
-                alphas[i], errors[i], lambdas[i] = optimal_lambda(
-                    fixedpoint.var_func_L2,
-                    fixedpoint.var_hat_func_Huber_num_eps,
-                    alpha_1=alpha_min,
-                    alpha_2=alpha_max,
-                    n_alpha_points=alpha_points,
-                    delta_small=delta_small,
-                    delta_large=delta_large,
-                    initial_cond=initial,
-                    eps=e,
-                    verbose=True,
-                )
+            alphas_Hub[i], errors_Hub[i], lambdas_Hub[i] = load_file(**experiment_dict)
 
-                np.savez(
-                    file_path, alphas=alphas[i], errors=errors[i], lambdas=lambdas[i],
-                )
 
-            else:
-                data = np.load(file_path)
+alphas_L2 = [None] * len(deltas) * len(eps)
+errors_L2 = [None] * len(deltas) * len(eps)
+lambdas_L2 = [None] * len(deltas) * len(eps)
 
-                alphas[i] = data["alphas"]
-                errors[i] = data["errors"]
-                lambdas[i] = data["lambdas"]
+colormap = fixedpoint.get_cmap(len(eps) * len(deltas) + 1)
 
-    alphas_L2 = [None] * len(deltas) * len(eps)
-    errors_L2 = [None] * len(deltas) * len(eps)
-    lambdas_L2 = [None] * len(deltas) * len(eps)
+# evaluates the lambda optimal for each value
+print("-- Optimal reg_param L2")
+for idx, e in enumerate(tqdm(eps, desc="epsilon", leave=False)):
+    for jdx, (delta_small, delta_large) in enumerate(
+        tqdm(deltas, desc="delta", leave=False)
+    ):
+        i = idx * len(deltas) + jdx
 
-    colormap = fixedpoint.get_cmap(len(eps) * len(deltas) + 1)
+        experiment_dict = {
+            "loss_name": "L2",
+            "alpha_min": alpha_min,
+            "alpha_max": alpha_max,
+            "alpha_pts": alpha_points,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "epsilon": e,
+            "experiment_type": "reg param optimal",
+        }
 
-    # evaluates the lambda optimal for each value
-    print("-- Optimal reg_param L2")
-    for idx, e in enumerate(tqdm(eps, desc="epsilon", leave=False)):
-        for jdx, (delta_small, delta_large) in enumerate(
-            tqdm(deltas, desc="delta", leave=False)
-        ):
-            i = idx * len(deltas) + jdx
+        file_exists, file_path = check_saved(**experiment_dict)
 
-            file_exists, file_path = check_saved(
-                loss_name="L2",
-                alpha_min=alpha_min,
-                alpha_max=alpha_max,
-                alpha_pts=alpha_points,
+        if not file_exists:
+            while True:
+                m = 0.89 * np.random.random() + 0.1
+                q = 0.89 * np.random.random() + 0.1
+                sigma = np.random.random()
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
+                    break
+
+            initial = [m, q, sigma]
+
+            alphas_L2[i], errors_L2[i], lambdas_L2[i] = optimal_lambda(
+                fixedpoint.var_func_L2,
+                fixedpoint.var_hat_func_L2_num_eps,
+                alpha_1=alpha_min,
+                alpha_2=alpha_max,
+                n_alpha_points=alpha_points,
                 delta_small=delta_small,
                 delta_large=delta_large,
-                epsilon=e,
-                experiment_type="reg param optimal",
+                initial_cond=initial,
+                eps=e,
+                verbose=True,
             )
 
-            if not file_exists:
-                while True:
-                    m = 0.89 * np.random.random() + 0.1
-                    q = 0.89 * np.random.random() + 0.1
-                    sigma = np.random.random()
-                    if (
-                        np.square(m) < q + delta_small * q
-                        and np.square(m) < q + delta_large * q
-                    ):
-                        break
+            experiment_dict.update(
+                {
+                    "file_path": file_path,
+                    "alphas": alphas_L2[i],
+                    "errors": errors_L2[i],
+                    "lambdas": lambdas_L2[i],
+                }
+            )
 
-                initial = [m, q, sigma]
+            save_file(**experiment_dict)
+        else:
+            experiment_dict.update({"file_path": file_path})
 
-                alphas_L2[i], errors_L2[i], lambdas_L2[i] = optimal_lambda(
-                    fixedpoint.var_func_L2,
-                    fixedpoint.var_hat_func_L2_num_eps,
-                    alpha_1=alpha_min,
-                    alpha_2=alpha_max,
-                    n_alpha_points=alpha_points,
-                    delta_small=delta_small,
-                    delta_large=delta_large,
-                    initial_cond=initial,
-                    eps=e,
-                    verbose=True,
-                )
+            alphas_L2[i], errors_L2[i], lambdas_L2[i] = load_file(**experiment_dict)
 
-                np.savez(
-                    file_path,
-                    alphas=alphas_L2[i],
-                    errors=errors_L2[i],
-                    lambdas=lambdas_L2[i],
-                )
+# evaluates the bayes optimal
+alphas_BO = [None] * len(deltas) * len(eps)
+errors_BO = [None] * len(deltas) * len(eps)
 
-            else:
-                data = np.load(file_path)
+print("-- BO")
+for idx, e in enumerate(tqdm(eps, desc="epsilon", leave=False)):
+    for jdx, (delta_small, delta_large) in enumerate(
+        tqdm(deltas, desc="delta", leave=False)
+    ):
+        i = idx * len(deltas) + jdx
 
-                alphas_L2[i] = data["alphas"]
-                errors_L2[i] = data["errors"]
-                lambdas_L2[i] = data["lambdas"]
+        experiment_dict = {
+            "alpha_min": alpha_min,
+            "alpha_max": alpha_max,
+            "alpha_pts": alpha_points,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "epsilon": e,
+            "experiment_type": "BO",
+        }
 
-    # evaluates the bayes optimal
-    alphasBO = [None] * len(deltas) * len(eps)
-    errorsBO = [None] * len(deltas) * len(eps)
+        file_exists, file_path = check_saved(**experiment_dict)
 
-    print("-- BO")
-    for idx, e in enumerate(tqdm(eps, desc="epsilon", leave=False)):
-        for jdx, (delta_small, delta_large) in enumerate(
-            tqdm(deltas, desc="delta", leave=False)
-        ):
-            i = idx * len(deltas) + jdx
+        if not file_exists:
+            while True:
+                m = 0.89 * np.random.random() + 0.1
+                q = 0.89 * np.random.random() + 0.1
+                sigma = 0.89 * np.random.random() + 0.1
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
+                    break
 
-            file_saved, file_path = check_saved(
-                alpha_min=alpha_min,
-                alpha_max=alpha_max,
-                alpha_pts=alpha_points,
+            initial = [m, q, sigma]
+
+            (
+                alphas_BO[i],
+                errors_BO[i],
+            ) = fixedpoint.projection_ridge_different_alpha_theory(
+                fixedpoint.var_func_BO,
+                fixedpoint.var_hat_func_BO_num_eps,
+                alpha_1=alpha_min,
+                alpha_2=alpha_max,
+                n_alpha_points=alpha_points,
+                lambd=1.0,
                 delta_small=delta_small,
                 delta_large=delta_large,
-                epsilon=e,
-                experiment_type="BO",
+                initial_cond=initial,
+                verbose=True,
+                eps=e,
             )
 
-            if not file_saved:
-                while True:
-                    m = 0.89 * np.random.random() + 0.1
-                    q = 0.89 * np.random.random() + 0.1
-                    sigma = 0.89 * np.random.random() + 0.1
-                    if (
-                        np.square(m) < q + delta_small * q
-                        and np.square(m) < q + delta_large * q
-                    ):
-                        break
-
-                initial = [m, q, sigma]
-
-                (
-                    alphasBO[i],
-                    errorsBO[i],
-                ) = fixedpoint.projection_ridge_different_alpha_theory(
-                    fixedpoint.var_func_BO,
-                    fixedpoint.var_hat_func_BO_num_eps,
-                    alpha_1=alpha_min,
-                    alpha_2=alpha_max,
-                    n_alpha_points=alpha_points,
-                    lambd=1.0,
-                    delta_small=delta_small,
-                    delta_large=delta_large,
-                    initial_cond=initial,
-                    verbose=True,
-                    eps=e,
-                )
-
-                np.savez(file_path, alphas=alphasBO[i], errors=errorsBO[i])
-
-            else:
-                saved_dat = np.load(file_path)
-
-                alphasBO[i] = saved_dat["alphas"]
-                errorsBO[i] = saved_dat["errors"]
-
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
-    figL2BO, axL2BO = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
-    figHubBO, axHubBO = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
-
-    colormap_BO = fixedpoint.get_cmap(len(eps) * len(deltas) + 2, name="Greys")
-
-    colormap = fixedpoint.get_cmap(len(eps) * len(deltas) + 2, name="Reds")
-
-    colormap_L2 = fixedpoint.get_cmap(len(eps) * len(deltas) + 2, name="Greens")
-
-    for idx, e in enumerate(eps):
-        for jdx, delta in enumerate(deltas):
-            i = idx * len(deltas) + jdx
-
-            ax.plot(
-                alphas[i],
-                errors[i],
-                # marker=".",
-                label=r"Huber $\epsilon = {}$ $\Delta = {}$".format(e, delta),
-                color=colormap(i + 2),
-                linewidth=2,
+            experiment_dict.update(
+                {"file_path": file_path, "alphas": alphas_BO[i], "errors": errors_BO[i],}
             )
 
-    for idx, e in enumerate(eps):
-        for jdx, delta in enumerate(deltas):
-            i = idx * len(deltas) + jdx
+            save_file(**experiment_dict)
+        else:
+            experiment_dict.update({"file_path": file_path})
 
-            ax.plot(
-                alphas_L2[i],
-                errors_L2[i],
-                # marker=".",
-                label=r"L2 $\epsilon = {}$ $\Delta = {}$".format(e, delta),
-                color=colormap_L2(i + 2),
-                linewidth=2,
-            )
+            alphas_BO[i], errors_BO[i] = load_file(**experiment_dict)
 
-    for idx, e in enumerate(eps):
-        for jdx, delta in enumerate(deltas):
-            i = idx * len(deltas) + jdx
-            ax.plot(
-                alphasBO[i],
-                errorsBO[i],
-                #  marker=".",
-                linestyle="dashed",
-                label=r"BO $\epsilon = {}$ $\Delta = {}$".format(e, delta),
-                color=colormap_BO(i + 2),
-            )
+# colormap_BO = fixedpoint.get_cmap(len(deltas) + 2, name="Greys")
 
-    ax.set_title(r"L2 vs. Huber $\lambda_{opt}$ vs. BO")
-    ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
-    ax.set_xlabel(r"$\alpha$")
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.minorticks_on()
-    ax.grid(True, which="both")
-    ax.legend()
+# colormap = fixedpoint.get_cmap(len(deltas) + 2, name="Reds")
 
-    # fig.savefig("./imgs/HubL2lambdaopt_{}.png".format(random_number), format="png")
+# colormap_L2 = fixedpoint.get_cmap(len(deltas) + 2, name="Greens")
 
-    for idx, e in enumerate(eps):
-        cmap = fixedpoint.get_cmap(len(deltas) + 1, name=names_cm[idx])
-        for jdx, delta in enumerate(deltas):
-            i = idx * len(deltas) + jdx
-            axL2BO.plot(
-                alphas_L2[i],
-                (errors_L2[i] - errorsBO[i]) / errorsBO[i],
-                linestyle="solid",
-                marker=".",
-                color=cmap(jdx + 1),
-                label=r"$\epsilon = {}$ $\Delta = {}$".format(e, delta),
-            )
+# for idx, e in enumerate(eps):
 
-    axL2BO.set_title(r"L2 $\lambda_{opt}$ vs. BO ")
-    axL2BO.set_ylabel(
-        r"$(\frac{1}{d} E[||\hat{w} - w^\star||^2]_{L2} - \frac{1}{d} E[||\hat{w} - w^\star||^2]_{BO} ) / E[||\hat{w} - w^\star||^2]_{BO}$"
-    )
-    axL2BO.set_xlabel(r"$\alpha$")
-    axL2BO.set_xscale("log")
-    axL2BO.set_yscale("log")
-    axL2BO.minorticks_on()
-    axL2BO.grid(True, which="both")
-    axL2BO.legend()
+#     for jdx, delta in enumerate(deltas):
+#         fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
-    figL2BO.savefig("./imgs/L2vslambdaopt_log_{}.png".format(random_number), format="png")
+#         i = idx * len(deltas) + jdx
 
-    for idx, e in enumerate(eps):
-        cmap = fixedpoint.get_cmap(len(deltas) + 1, name=names_cm[idx])
-        for jdx, delta in enumerate(deltas):
-            i = idx * len(deltas) + jdx
-            axHubBO.plot(
-                alphas[i],
-                (errors[i] - errorsBO[i]) / errorsBO[i],
-                marker=".",
-                color=cmap(jdx + 1),
-                label=r"$\epsilon = {}$ $\Delta = {}$".format(e, delta),
-            )
+#         ax.plot(
+#             alphas[i],
+#             errors[i],
+#             # marker=".",
+#             label=r"Huber",
+#             color="g",  #  colormap(jdx + 2),
+#         )
 
-    axHubBO.set_title(r"Huber $\lambda_{opt}$ vs. BO")
-    axHubBO.set_ylabel(
-        r"$(E[||\hat{w} - w^\star||^2]_{Huber} - E[||\hat{w} - w^\star||^2]_{BO} ) / E[||\hat{w} - w^\star||^2]_{BO}$"
-    )
-    axHubBO.set_xlabel(r"$\alpha$")
-    axHubBO.set_xscale("log")
-    axHubBO.set_yscale("log")
-    axHubBO.minorticks_on()
-    axHubBO.grid(True, which="both")
-    axHubBO.legend()
+#         ax.plot(
+#             alphas_L2[i],
+#             errors_L2[i],
+#             # marker=".",
+#             label=r"L2",
+#             color="r",  #  colormap_L2(jdx + 2),
+#         )
 
-    figHubBO.savefig(
-        "./imgs/Hubvslambdaopt_log_{}.png".format(random_number), format="png"
-    )
+#         ax.plot(
+#             alphasBO[i],
+#             errorsBO[i],
+#             #  marker=".",
+#             linestyle="dashed",
+#             label=r"BO",
+#             color="k",  #  colormap_BO(jdx + 2),
+#         )
 
-    plt.show()
+#         ax.set_title(
+#             r"L2 vs. Huber $\lambda_{{opt}}$ vs. BO $\epsilon$ = {} $\Delta$ = {}".format(
+#                 e, delta
+#             )
+#         )
+#         ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
+#         ax.set_xlabel(r"$\alpha$")
+#         ax.set_xscale("log")
+#         ax.set_yscale("log")
+#         ax.minorticks_on()
+#         ax.grid(True, which="both")
+#         ax.legend()
+
+#         fig.savefig(
+#             "./imgs/confront_epsil_{}_delta_{}_{}.png".format(
+#                 e, delta, random_number
+#             ),
+#             format="png",
+#         )
+
+#         plt.show()
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
+figL2BO, axL2BO = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
+figHubBO, axHubBO = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
+
+colormap_BO = fixedpoint.get_cmap(len(eps) * len(deltas) + 2, name="Greys")
+
+colormap = fixedpoint.get_cmap(len(eps) * len(deltas) + 2, name="Reds")
+
+colormap_L2 = fixedpoint.get_cmap(len(eps) * len(deltas) + 2, name="Greens")
+
+for idx, e in enumerate(eps):
+    for jdx, delta in enumerate(deltas):
+        i = idx * len(deltas) + jdx
+
+        ax.plot(
+            alphas_Hub[i],
+            errors_Hub[i],
+            # marker=".",
+            label=r"Huber $\epsilon = {}$ $\Delta = {}$".format(e, delta),
+            color=colormap(i + 2),
+            linewidth=2,
+        )
+
+for idx, e in enumerate(eps):
+    for jdx, delta in enumerate(deltas):
+        i = idx * len(deltas) + jdx
+
+        ax.plot(
+            alphas_L2[i],
+            errors_L2[i],
+            # marker=".",
+            label=r"L2 $\epsilon = {}$ $\Delta = {}$".format(e, delta),
+            color=colormap_L2(i + 2),
+            linewidth=2,
+        )
+
+for idx, e in enumerate(eps):
+    for jdx, delta in enumerate(deltas):
+        i = idx * len(deltas) + jdx
+        ax.plot(
+            alphas_BO[i],
+            errors_BO[i],
+            #  marker=".",
+            linestyle="dashed",
+            label=r"BO $\epsilon = {}$ $\Delta = {}$".format(e, delta),
+            color=colormap_BO(i + 2),
+        )
+
+ax.set_title(r"L2 vs. Huber $\lambda_{opt}$ vs. BO")
+ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
+ax.set_xlabel(r"$\alpha$")
+ax.set_xscale("log")
+ax.set_yscale("log")
+ax.minorticks_on()
+ax.grid(True, which="both")
+ax.legend()
+
+# fig.savefig("./imgs/HubL2lambdaopt_{}.png".format(random_number), format="png")
+
+for idx, e in enumerate(eps):
+    cmap = fixedpoint.get_cmap(len(deltas) + 1, name=names_cm[idx])
+    for jdx, delta in enumerate(deltas):
+        i = idx * len(deltas) + jdx
+        axL2BO.plot(
+            alphas_L2[i],
+            (errors_L2[i] - errors_BO[i]) / errors_BO[i],
+            linestyle="solid",
+            marker=".",
+            color=cmap(jdx + 1),
+            label=r"$\epsilon = {}$ $\Delta = {}$".format(e, delta),
+        )
+
+axL2BO.set_title(r"L2 $\lambda_{opt}$ vs. BO ")
+axL2BO.set_ylabel(
+    r"$(\frac{1}{d} E[||\hat{w} - w^\star||^2]_{L2} - \frac{1}{d} E[||\hat{w} - w^\star||^2]_{BO} ) / E[||\hat{w} - w^\star||^2]_{BO}$"
+)
+axL2BO.set_xlabel(r"$\alpha$")
+axL2BO.set_xscale("log")
+axL2BO.set_yscale("log")
+axL2BO.minorticks_on()
+axL2BO.grid(True, which="both")
+axL2BO.legend()
+
+# figL2BO.savefig("./imgs/L2vslambdaopt_log_{}.png".format(random_number), format="png")
+
+for idx, e in enumerate(eps):
+    cmap = fixedpoint.get_cmap(len(deltas) + 1, name=names_cm[idx])
+    for jdx, delta in enumerate(deltas):
+        i = idx * len(deltas) + jdx
+        axHubBO.plot(
+            alphas_Hub[i],
+            (errors_Hub[i] - errors_BO[i]) / errors_BO[i],
+            marker=".",
+            color=cmap(jdx + 1),
+            label=r"$\epsilon = {}$ $\Delta = {}$".format(e, delta),
+        )
+
+axHubBO.set_title(r"Huber $\lambda_{opt}$ vs. BO")
+axHubBO.set_ylabel(
+    r"$(E[||\hat{w} - w^\star||^2]_{Huber} - E[||\hat{w} - w^\star||^2]_{BO} ) / E[||\hat{w} - w^\star||^2]_{BO}$"
+)
+axHubBO.set_xlabel(r"$\alpha$")
+axHubBO.set_xscale("log")
+axHubBO.set_yscale("log")
+axHubBO.minorticks_on()
+axHubBO.grid(True, which="both")
+axHubBO.legend()
+
+# figHubBO.savefig(
+#     "./imgs/Hubvslambdaopt_log_{}.png".format(random_number), format="png"
+# )
+
+plt.show()

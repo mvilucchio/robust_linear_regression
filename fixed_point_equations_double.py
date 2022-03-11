@@ -2,31 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 import numerical_function_double as numfuneps
-from src.utils import file_name_generator
-import os
-
-
-theory_path = "./data/theory"
-experiments_path = "./data/experiments"
-
-data_dir_exists = os.path.exists("./data")
-if not data_dir_exists:
-    os.makedirs("./data")
-    os.makedirs("./data/theory")
-    os.makedirs("./data/experiments")
-
-theory_dir_exists = os.path.exists("./data/theory")
-experiments_dir_exists = os.path.exists("./data/experiments")
-
-if not theory_dir_exists:
-    os.makedirs("./data/theory")
-
-if not experiments_dir_exists:
-    os.makedirs("./data/experiments")
-
-random_number = np.random.randint(0, 100)
-
-names_cm = ["Purples", "Blues", "Greens", "Oranges", "Greys"]
+from src.utils import check_saved, save_file, load_file
 
 
 def get_cmap(n, name="hsv"):
@@ -191,6 +167,8 @@ if __name__ == "__main__":
     deltas = [[0.1, 3.0], [0.5, 1.5], [1.0, 2.0], [1.0, 5.0], [1.0, 10.0]]  #
     lambdas = [0.01]  # , 0.1, 1.0, 10.0, 100.0
 
+    names_cm = ["Purples", "Blues", "Greens", "Oranges", "Greys"]
+
     random_number = np.random.randint(0, 100)
 
     alphas = [None] * len(deltas) * len(lambdas)
@@ -202,26 +180,20 @@ if __name__ == "__main__":
         for jdx, (delta_small, delta_large) in enumerate(
             tqdm(deltas, desc="delta", leave=False)
         ):
-            file_path = os.path.join(
-                theory_path,
-                file_name_generator(
-                    loss_name,
-                    alpha_min,
-                    alpha_max,
-                    alpha_points,
-                    0.0,
-                    0,
-                    l,
-                    delta_small,
-                    delta_large=delta_large,
-                    eps=eps,
-                    experiment_type="BO",
-                ),
-            )
-
-            file_exists = os.path.exists(file_path + ".npz")
-
             i = idx * len(deltas) + jdx
+
+            experiment_dict = {
+                "loss_name": loss_name,
+                "alpha_min": alpha_min,
+                "alpha_max": alpha_max,
+                "alpha_pts": alpha_points,
+                "delta_small": delta_small,
+                "delta_large": delta_large,
+                "epsilon": eps,
+                "experiment_type": "BO",
+            }
+
+            file_exists, file_path = check_saved(**experiment_dict)
 
             if not file_exists:
                 while True:
@@ -249,12 +221,15 @@ if __name__ == "__main__":
                     verbose=True,
                 )
 
-                np.savez(file_path, alphas=alphas[i], errors=errors[i])
-            else:
-                stored_data = np.load(file_path + ".npz")
+                experiment_dict.update(
+                    {"file_path": file_path, "alphas": alphas[i], "errors": errors[i],}
+                )
 
-                alphas[i] = stored_data["alphas"]
-                errors[i] = stored_data["errors"]
+                save_file(**experiment_dict)
+            else:
+                experiment_dict.update({"file_path": file_path})
+
+                alphas[i], errors[i] = load_file(**experiment_dict)
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 

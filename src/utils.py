@@ -2,7 +2,7 @@ import numpy as np
 import os
 from re import search
 
-MULT_INTEGRAL = 5
+MULT_INTEGRAL = 10
 TOL_INT = 1e-6
 N_TEST_POINTS = 300
 

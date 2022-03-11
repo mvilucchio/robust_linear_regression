@@ -1,13 +1,12 @@
-from winreg import ExpandEnvironmentStrings
 import numpy as np
 import matplotlib.pyplot as plt
-import fixed_point_equations as fpe
+import fixed_point_equations_double as fpedbl
 from tqdm.auto import tqdm
-from src.utils import check_saved, save_file, load_file
+from src.utils import check_saved, load_file, save_file
 
 random_number = np.random.randint(0, 100)
 
-names_cm = ["Greens", "Oranges", "Reds", "Purples", "YlGnBu", "RdPu", "Blues"]
+names_cm = ["YlGnBu", "RdPu", "Greens", "Oranges", "Reds", "Purples", "Blues"]
 
 
 def get_cmap(n, name="hsv"):
@@ -15,17 +14,22 @@ def get_cmap(n, name="hsv"):
 
 
 alpha_min, alpha_max = 0.01, 100
+epsil = 0.3
 alpha_points_theory = 31
 d = 500
 reps = 20
-deltas = [[0.1, 1.0]]  # , [1.0, 5.0], [1.0, 10.0]
-lambdas = [0.5, 1.0, 2.0]
+deltas = [[0.5, 1.5], [0.5, 2.5], [1.0, 2.0]]
+lambdas = [0.5, 1.0, 1.5, 2.0]
 
 alphas_theory = [None] * len(deltas) * len(lambdas)
 errors_theory = [None] * len(deltas) * len(lambdas)
 
+print("--- theory {}".format("L2"))
+
 for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
-    for jdx, [delta_small, _] in enumerate(tqdm(deltas, desc="delta", leave=False)):
+    for jdx, [delta_small, delta_large] in enumerate(
+        tqdm(deltas, desc="delta", leave=False)
+    ):
         i = idx * len(deltas) + jdx
 
         experiment_dict = {
@@ -35,6 +39,8 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
             "alpha_pts": alpha_points_theory,
             "reg_param": l,
             "delta_small": delta_small,
+            "delta_large": delta_large,
+            "epsilon": epsil,
             "experiment_type": "theory",
         }
 
@@ -45,7 +51,10 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if np.square(m) < q + delta_small * q:
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
                     break
 
             initial = [m, q, sigma]
@@ -53,17 +62,20 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
             (
                 alphas_theory[i],
                 errors_theory[i],
-            ) = fpe.projection_ridge_different_alpha_theory(
-                fpe.var_func_L2,
-                fpe.var_hat_func_L2_num,
+            ) = fpedbl.projection_ridge_different_alpha_theory(
+                fpedbl.var_func_L2,
+                fpedbl.var_hat_func_L2_num_eps,
                 alpha_1=alpha_min,
                 alpha_2=alpha_max,
                 n_alpha_points=alpha_points_theory,
                 lambd=l,
-                delta=delta_small,
+                delta_small=delta_small,
+                delta_large=delta_large,
                 initial_cond=initial,
+                eps=epsil,
                 verbose=True,
             )
+
             experiment_dict.update(
                 {
                     "file_path": file_path,
@@ -80,13 +92,17 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
 alphas_BO = [None] * len(deltas)
 errors_BO = [None] * len(deltas)
 
-for jdx, [delta_small, _] in enumerate(tqdm(deltas, desc="delta", leave=False)):
+print("--- BO")
+
+for jdx, [delta_small, delta_large] in enumerate(tqdm(deltas, desc="delta", leave=False)):
 
     experiment_dict = {
         "alpha_min": alpha_min,
         "alpha_max": alpha_max,
         "alpha_pts": alpha_points_theory,
         "delta_small": delta_small,
+        "delta_large": delta_large,
+        "epsilon": epsil,
         "experiment_type": "BO",
     }
 
@@ -97,20 +113,22 @@ for jdx, [delta_small, _] in enumerate(tqdm(deltas, desc="delta", leave=False)):
             m = 0.89 * np.random.random() + 0.1
             q = 0.89 * np.random.random() + 0.1
             sigma = 0.89 * np.random.random() + 0.1
-            if np.square(m) < q + delta_small * q:
+            if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
                 break
 
         initial = [m, q, sigma]
 
-        alphas_BO[jdx], errors_BO[jdx] = fpe.projection_ridge_different_alpha_theory(
-            fpe.var_func_BO,
-            fpe.var_hat_func_BO,
+        alphas_BO[jdx], errors_BO[jdx] = fpedbl.projection_ridge_different_alpha_theory(
+            fpedbl.var_func_BO,
+            fpedbl.var_hat_func_BO_num_eps,
             alpha_1=alpha_min,
             alpha_2=alpha_max,
             n_alpha_points=alpha_points_theory,
             lambd=l,
-            delta=delta_small,
+            delta_small=delta_small,
+            delta_large=delta_large,
             initial_cond=initial,
+            eps=epsil,
             verbose=True,
         )
 
@@ -135,7 +153,7 @@ for idx, l in enumerate(lambdas):
             alphas_theory[i],
             errors_theory[i],
             # marker='.',
-            label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta[0]),
+            label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
             color=colormap(jdx + 3),
         )
 
@@ -145,9 +163,8 @@ for jdx, delta in enumerate(deltas):
     ax.plot(
         alphas_BO[jdx],
         errors_BO[jdx],
-        marker=".",
-        linestyle="dashed",
-        label=r"BO $\Delta$ = {}".format(delta[0]),
+        # marker='.',
+        label=r"BO $\Delta$ = {}".format(delta),
         color=colormapBO(jdx + 3),
     )
 
@@ -161,10 +178,10 @@ ax.minorticks_on()
 ax.grid(True, which="both")
 ax.legend()
 
-# fig.savefig(
-#     "./imgs/together - double noise - code {}.png".format(random_number),
-#     format="png",
-#     dpi=150,
-# )
+fig.savefig(
+    "./imgs/together - double noise - code {}.png".format(random_number),
+    format="png",
+    dpi=150,
+)
 
 plt.show()

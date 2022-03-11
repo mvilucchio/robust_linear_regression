@@ -3,26 +3,7 @@ import matplotlib.pyplot as plt
 import fixed_point_equations_double as fpedbl
 import numerics as num
 from tqdm.auto import tqdm
-import os
-from src.utils import file_name_generator
-
-theory_path = "./data/theory"
-experiments_path = "./data/experiments"
-
-data_dir_exists = os.path.exists("./data")
-if not data_dir_exists:
-    os.makedirs("./data")
-    os.makedirs("./data/theory")
-    os.makedirs("./data/experiments")
-
-theory_dir_exists = os.path.exists("./data/theory")
-experiments_dir_exists = os.path.exists("./data/experiments")
-
-if not theory_dir_exists:
-    os.makedirs("./data/theory")
-
-if not experiments_dir_exists:
-    os.makedirs("./data/experiments")
+from src.utils import check_saved, load_file, save_file
 
 random_number = np.random.randint(0, 100)
 
@@ -35,12 +16,12 @@ def get_cmap(n, name="hsv"):
 
 loss_chosen = "Huber"
 alpha_min, alpha_max = 0.01, 100
-epsil = 0.1
-alpha_points_num = 15
-alpha_points_theory = 51
+epsil = 0.3
+alpha_points_num = 31
+alpha_points_theory = 61
 d = 500
 reps = 10
-deltas = [[0.5, 1.5], [0.5, 2.0], [0.5, 5.0]]
+deltas = [[0.1, 2.0], [0.5, 1.5], [0.5, 2.0], [0.5, 5.0]]
 lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
 alphas_num = [None] * len(deltas) * len(lambdas)
@@ -53,24 +34,21 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
     ):
         i = idx * len(deltas) + jdx
 
-        file_path = os.path.join(
-            experiments_path,
-            file_name_generator(
-                loss_chosen,
-                alpha_min,
-                alpha_max,
-                alpha_points_num,
-                d,
-                reps,
-                l,
-                delta_small,
-                delta_large=delta_large,
-                eps=epsil,
-                experiment=True,
-            ),
-        )
+        experiment_dict = {
+            "loss_name": loss_chosen,
+            "alpha_min": alpha_min,
+            "alpha_max": alpha_max,
+            "alpha_pts": alpha_points_num,
+            "dim": d,
+            "rep": reps,
+            "reg_param": l,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "epsilon": epsil,
+            "experiment_type": "exp",
+        }
 
-        file_exists = os.path.exists(file_path + ".npz")
+        file_exists, file_path = check_saved(**experiment_dict)
 
         if not file_exists:
             (
@@ -78,7 +56,7 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 final_errors_mean[i],
                 final_errors_std[i],
             ) = num.generate_different_alpha_double_noise(
-                num.find_coefficients_Huber,
+                num.find_coefficients_ridge,
                 delta_small=delta_small,
                 delta_large=delta_large,
                 alpha_1=alpha_min,
@@ -90,18 +68,22 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 eps=epsil,
             )
 
-            np.savez(
-                file_path,
-                alphas=alphas_num[i],
-                error_mean=final_errors_mean[i],
-                error_std=final_errors_std[i],
+            experiment_dict.update(
+                {
+                    "file_path": file_path,
+                    "alphas": alphas_num[i],
+                    "errors_mean": final_errors_mean[i],
+                    "errors_std": final_errors_std[i],
+                }
             )
-        else:
-            stored_data = np.load(file_path + ".npz")
 
-            alphas_num[i] = stored_data["alphas"]
-            final_errors_mean[i] = stored_data["error_mean"]
-            final_errors_std[i] = stored_data["error_std"]
+            save_file(**experiment_dict)
+        else:
+            experiment_dict.update({"file_path": file_path})
+
+            alphas_num[i], final_errors_mean[i], final_errors_std[i] = load_file(
+                **experiment_dict
+            )
 
 
 alphas_theory = [None] * len(deltas) * len(lambdas)
@@ -113,24 +95,19 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
     ):
         i = idx * len(deltas) + jdx
 
-        file_path = os.path.join(
-            theory_path,
-            file_name_generator(
-                loss_chosen,
-                alpha_min,
-                alpha_max,
-                alpha_points_num,
-                d,
-                reps,
-                l,
-                delta_small,
-                delta_large=delta_large,
-                eps=epsil,
-                experiment=False,
-            ),
-        )
+        experiment_dict = {
+            "loss_name": loss_chosen,
+            "alpha_min": alpha_min,
+            "alpha_max": alpha_max,
+            "alpha_pts": alpha_points_theory,
+            "reg_param": l,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "epsilon": epsil,
+            "experiment_type": "theory",
+        }
 
-        file_exists = os.path.exists(file_path + ".npz")
+        file_exists, file_path = check_saved(**experiment_dict)
 
         if not file_exists:
             while True:
@@ -150,7 +127,7 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 errors_theory[i],
             ) = fpedbl.projection_ridge_different_alpha_theory(
                 fpedbl.var_func_L2,
-                fpedbl.var_hat_func_Huber_num_eps,
+                fpedbl.var_hat_func_L2_num_eps,
                 alpha_1=alpha_min,
                 alpha_2=alpha_max,
                 n_alpha_points=alpha_points_theory,
@@ -162,12 +139,20 @@ for idx, l in enumerate(tqdm(lambdas, desc="lambda", leave=False)):
                 verbose=True,
             )
 
-            np.savez(file_path, alphas=alphas_theory[i], errors=errors_theory[i])
-        else:
-            stored_data = np.load(file_path + ".npz")
+            experiment_dict.update(
+                {
+                    "file_path": file_path,
+                    "alphas": alphas_theory[i],
+                    "errors": errors_theory[i],
+                }
+            )
 
-            alphas_theory[i] = stored_data["alphas"]
-            errors_theory[i] = stored_data["errors"]
+            save_file(**experiment_dict)
+        else:
+            experiment_dict.update({"file_path": file_path})
+
+            alphas_theory[i], errors_theory[i] = load_file(**experiment_dict)
+
 
 fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
