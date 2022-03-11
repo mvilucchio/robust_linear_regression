@@ -2,9 +2,6 @@ import numpy as np
 import os
 from re import search
 
-MULT_INTEGRAL = 10
-TOL_INT = 1e-6
-N_TEST_POINTS = 300
 
 DATA_FOLDER_PATH = "./data"
 
@@ -39,105 +36,6 @@ DOUBLE_NOISE_NAMES = [
     "{loss_name} double noise - eps {epsilon} - reg_param optimal - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
     "{loss_name} double noise - eps {epsilon} - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}] - lambda {reg_param}",
 ]
-
-# ------------
-
-
-def find_integration_borders_square(
-    fun, scale1, scale2, mult=MULT_INTEGRAL, tol=TOL_INT, n_points=N_TEST_POINTS
-):
-    borders = [[-mult * scale1, mult * scale1], [-mult * scale2, mult * scale2]]
-
-    for idx, ax in enumerate(borders):
-        for jdx, border in enumerate(ax):
-
-            while True:
-                if idx == 0:
-                    max_val = np.max(
-                        [
-                            fun(borders[idx][jdx], pt)
-                            for pt in np.linspace(
-                                borders[1 if idx == 0 else 0][0],
-                                borders[1 if idx == 0 else 0][1],
-                                n_points,
-                            )
-                        ]
-                    )
-                else:
-                    max_val = np.max(
-                        [
-                            fun(pt, borders[idx][jdx])
-                            for pt in np.linspace(
-                                borders[1 if idx == 0 else 0][0],
-                                borders[1 if idx == 0 else 0][1],
-                                n_points,
-                            )
-                        ]
-                    )
-                if max_val > tol:
-                    borders[idx][jdx] = borders[idx][jdx] + (
-                        -1.0 if jdx == 0 else 1.0
-                    ) * (scale1 if idx == 0 else scale2)
-                else:
-                    break
-
-    for ax in borders:
-        ax[0] = -np.max(np.abs(ax))
-        ax[1] = np.max(np.abs(ax))
-
-    max_val = np.max([borders[0][1], borders[1][1]])
-
-    borders = [[-max_val, max_val], [-max_val, max_val]]
-
-    return borders
-
-
-def divide_integration_borders_grid(borders, proportion=0.5, sides_square=3):
-    max_range = borders[0][1]
-    mid_range = proportion * max_range
-
-    # 1 | 2 | 3
-    # 4 | 5 | 6
-    # 7 | 8 | 9
-
-    domain_xi = [
-        [-mid_range, mid_range],
-        [-mid_range, mid_range],
-        [mid_range, max_range],
-        [mid_range, max_range],
-        [mid_range, max_range],
-        [-mid_range, mid_range],
-        [-max_range, -mid_range],
-        [-max_range, -mid_range],
-        [-max_range, -mid_range],
-    ]
-
-    domain_y = [
-        [lambda xi: -mid_range, lambda xi: mid_range],
-        [lambda xi: mid_range, lambda xi: max_range],
-        [lambda xi: mid_range, lambda xi: max_range],
-        [lambda xi: -mid_range, lambda xi: mid_range],
-        [lambda xi: -max_range, lambda xi: -mid_range],
-        [lambda xi: -max_range, lambda xi: -mid_range],
-        [lambda xi: -max_range, lambda xi: -mid_range],
-        [lambda xi: -mid_range, lambda xi: mid_range],
-        [lambda xi: mid_range, lambda xi: max_range],
-    ]
-
-    integral_value = 0.0
-    for xi_funs, y_funs in zip(domain_xi, domain_y):
-        integral_value += dblquad(
-            q_integral_BO_eps,
-            xi_funs[0],
-            xi_funs[1],
-            y_funs[0],
-            y_funs[1],
-            args=(q, m, sigma, delta_small, delta_large, eps),
-        )[0]
-
-    return integral_value
-    return
-
 
 # ------------
 
