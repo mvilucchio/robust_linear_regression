@@ -27,11 +27,6 @@ def state_equations(
         )
 
         err = np.max(np.abs([(temp_m - m), (temp_q - q), (temp_sigma - sigma)]))
-        # print(
-        #     "error : {:.6f} alpha : {:.3f} m : {:.6f} q : {:.6f} sigma : {:.6f}".format(
-        #         err, alpha, m, q, sigma
-        #     )
-        # )
 
         m = blend * m + (1 - blend) * temp_m
         q = blend * q + (1 - blend) * temp_q
@@ -58,6 +53,7 @@ def projection_ridge_different_alpha_theory(
     )
     error_theory = np.zeros(n_alpha_points)
 
+    # this is the for to parallelize
     for i, alpha in enumerate(alphas):
         m, q, _ = state_equations(
             var_func,

@@ -23,6 +23,8 @@ def optimal_lambda(
     error_theory = np.zeros(n_alpha_points)
     lambd_opt = np.zeros(n_alpha_points)
 
+    # for to parallelize is this one. By parallelizing in this file should already take
+    # care of all the calls
     for i, alpha in enumerate(alphas):
 
         def error_func(reg_param):
