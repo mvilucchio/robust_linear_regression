@@ -7,7 +7,7 @@ import sys
 alpha_min, alpha_max = 0.01, 100
 alpha_points = 21
 
-epsilon, delta_small, delta_large = map(float, sys.argv[1:])
+epsilon, delta_small, delta_large = 0.1, 0.1, 2.0  # map(float, sys.argv[1:])
 
 experiment_dict = {
     "loss_name": "Huber",
