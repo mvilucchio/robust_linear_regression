@@ -9,7 +9,6 @@ def optimal_lambda(
     var_hat_func,
     alpha_1=0.01,
     alpha_2=100,
-    n_alpha_points=16,
     delta_small=1.0,
     delta_large=10.0,
     initial_cond=[0.6, 0.0, 0.0],
@@ -25,8 +24,8 @@ def optimal_lambda(
     )
 
     initial = initial_cond
-    error_theory = np.zeros(n_alpha_points)
-    lambd_opt = np.zeros(n_alpha_points)
+    error_theory = np.zeros(pool_size)
+    lambd_opt = np.zeros(pool_size)
 
     def error_func(reg_param):
         m, q, _ = fixedpoint.state_equations(
