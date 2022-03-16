@@ -68,7 +68,7 @@ def create_check_folders():
 
 
 def check_saved(**kwargs):
-    create_check_folders()
+    # create_check_folders()
 
     experiment_code = _exp_type_choser(kwargs["experiment_type"])
     folder_path = FOLDER_PATHS[experiment_code]

@@ -1,5 +1,5 @@
 import numpy as np
-from tqdm.auto import tqdm
+# from tqdm.auto import tqdm
 from scipy.integrate import dblquad
 from numba import njit, vectorize
 import fixed_point_equations_double as fpedb

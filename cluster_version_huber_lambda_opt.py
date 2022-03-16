@@ -10,7 +10,7 @@ alpha_min, alpha_max = 0.01, 100
 if len(sys.argv) == 1:
     epsilon, delta_small, delta_large = 0.1, 0.1, 2.0
 else:
-    psilon, delta_small, delta_large = map(float, sys.argv[1:])
+    epsilon, delta_small, delta_large = map(float, sys.argv[1:])
 
 comm = MPI.COMM_WORLD
 
@@ -37,6 +37,7 @@ if not file_exists:
 
     initial = [m, q, sigma]
 
+    print(epsilon)
     # the call to this function is the one who should be parallelized
     # it is fond in the file cluster_version_optimal_lambda.py
     alphas, errors, lambdas = optimal_lambda(
