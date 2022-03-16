@@ -136,8 +136,8 @@ def load_file(**kwargs):
         return alphas, errors
     elif experiment_code == 3:
         alphas = saved_data["alphas"]
-        errors = (kwargs["errors"],)
-        lambdas = (kwargs["lambdas"],)
+        errors = saved_data["errors"]
+        lambdas = saved_data["lambdas"]
         return alphas, errors, lambdas
     else:
         raise ValueError("experiment_type not recognized.")
