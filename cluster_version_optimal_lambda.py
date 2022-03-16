@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize
-import fixed_point_equations_double as fixedpoint
+import cluster_version_fixed_point_equations_double as fixedpoint
 from mpi4py import MPI
 
 
