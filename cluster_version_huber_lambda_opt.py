@@ -37,7 +37,6 @@ if not file_exists:
 
     initial = [m, q, sigma]
 
-    print(epsilon)
     # the call to this function is the one who should be parallelized
     # it is fond in the file cluster_version_optimal_lambda.py
     alphas, errors, lambdas = optimal_lambda(

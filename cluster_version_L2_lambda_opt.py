@@ -3,17 +3,22 @@ from cluster_version_optimal_lambda import optimal_lambda
 import cluster_version_fixed_point_equations_double as fixedpoint
 from src.utils import check_saved, save_file, load_file
 import sys
+from mpi4py import MPI
 
 alpha_min, alpha_max = 0.01, 100
-alpha_points = 21
 
-epsilon, delta_small, delta_large = map(float, sys.argv[1:])
+if len(sys.argv) == 1:
+    epsilon, delta_small, delta_large = 0.1, 0.1, 2.0
+else:
+    epsilon, delta_small, delta_large = map(float, sys.argv[1:])
+
+comm = MPI.COMM_WORLD
 
 experiment_dict = {
     "loss_name": "L2",
     "alpha_min": alpha_min,
     "alpha_max": alpha_max,
-    "alpha_pts": alpha_points,
+    "alpha_pts": comm.Get_size(),
     "delta_small": delta_small,
     "delta_large": delta_large,
     "epsilon": epsilon,
@@ -39,12 +44,10 @@ if not file_exists:
         fixedpoint.var_hat_func_L2_num_eps,
         alpha_1=alpha_min,
         alpha_2=alpha_max,
-        n_alpha_points=alpha_points,
         delta_small=delta_small,
         delta_large=delta_large,
         initial_cond=initial,
-        eps=epsilon,
-        verbose=True,
+        eps=epsilon
     )
 
     experiment_dict.update(
