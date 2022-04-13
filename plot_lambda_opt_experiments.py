@@ -1,10 +1,9 @@
-import numpy as np
 import matplotlib.pyplot as plt
 from src.utils import check_saved, load_file
 
-alpha_min, alpha_max, alpha_points = 0.01, 100, 21
-delta_small, delta_large = 1.0, 2.0
-e = 0.1
+alpha_min, alpha_max, alpha_points = 0.01, 100, 36
+delta_small, delta_large = 0.1, 10.0
+e = 0.3
 
 experiments = [
     {
@@ -26,6 +25,15 @@ experiments = [
         "delta_large": delta_large,
         "epsilon": e,
         "experiment_type": "reg param optimal",
+    },
+    {
+        "alpha_min": alpha_min,
+        "alpha_max": alpha_max,
+        "alpha_pts": alpha_points,
+        "delta_small": delta_small,
+        "delta_large": delta_large,
+        "epsilon": e,
+        "experiment_type": "BO",
     },
 ]
 

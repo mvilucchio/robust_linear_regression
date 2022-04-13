@@ -1,11 +1,19 @@
 # Robust Linear Regression
 
-There are some `.py` files that are named as `cluster_version_*.py` and those are the ones parallelized and stripped down of the progress bars using thus minimal dependancies.
+## Code Organization
 
-To run optimal lambda simulations the files to run are the ones `cluster_version_huber_lambda_opt.py` and `cluster_version_L2_lambda_opt.py`. To run them one should use 3 system arguments as follows:
+The idea behind the code is based on having functions that let you preform the simulations that you want to use. The principal files are the following:
 
-```
-python cluster_version_*_lambda_opt epsilon delta_small delta_large
-```
+- `fpeqs.py` contains all of the functions to run simulations for the fixed point equations
+- `numerics.py` contains the functions to run the numerical experiments 
+- `numerical_functions.py` mostly contains all the functions to perform numerical integrations and that are called from `fpeqs.py`.
+- `utils.py` contains functions to load and save simulations data
+- `integration_utils.py` contains functions that are used to perform integrations
 
-this should do the job.
+All of the functions used to save and load files are contained in `src.py`.
+
+The folder `src_cluster` contains all files that only reference themselves and present a parallel implementation. These files are also working on minimal dependances (`numpy`, `scipy`, `sklearn`) and are meant to be runned in parallel.
+
+## Tests
+
+To run the tests for the code one should run the file `unittests/run_tests.py`.

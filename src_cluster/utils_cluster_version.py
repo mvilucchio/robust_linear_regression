@@ -1,9 +1,9 @@
 import numpy as np
 import os
 from re import search
-import src.numerics as num
-import src.fpeqs as fpe
-from src.optimal_lambda import optimal_lambda
+import src_cluster.numerics_cluster_version as num
+import src_cluster.fpeqs_cluster_version as fpe
+from src_cluster.optimal_lambda_cluster_version import optimal_lambda
 
 
 DATA_FOLDER_PATH = "./data"
