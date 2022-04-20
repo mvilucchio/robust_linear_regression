@@ -70,6 +70,11 @@ def find_integration_borders_square(
 
 
 def divide_integration_borders_grid(square_borders, proportion=0.5):  # , sides_square=3
+    if proportion >= 1.0 or proportion <= 0.0:
+        raise ValueError(
+            "proportion should be a number between 0.0 and 1.0 not included."
+        )
+
     max_range = square_borders[0][1]
     mid_range = proportion * max_range
 
