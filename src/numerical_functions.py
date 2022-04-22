@@ -188,36 +188,36 @@ def sigma_integral_L1_single_noise(y, xi, q, m, sigma, delta):
 
 
 @njit(error_model="numpy", fastmath=True)
-def m_integral_Huber_single_noise(y, xi, q, m, sigma, delta):
+def m_integral_Huber_single_noise(y, xi, q, m, sigma, delta, a):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
         * ZoutBayes_single_noise(y, np.sqrt(eta) * xi, (1 - eta), delta)
         * foutBayes_single_noise(y, np.sqrt(eta) * xi, (1 - eta), delta)
-        * foutHuber(y, np.sqrt(q) * xi, sigma)
+        * foutHuber(y, np.sqrt(q) * xi, sigma, a)
     )
 
 
 @njit(error_model="numpy", fastmath=True)
-def q_integral_Huber_single_noise(y, xi, q, m, sigma, delta):
+def q_integral_Huber_single_noise(y, xi, q, m, sigma, delta, a):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
         * ZoutBayes_single_noise(y, np.sqrt(eta) * xi, (1 - eta), delta)
-        * (foutHuber(y, np.sqrt(q) * xi, sigma) ** 2)
+        * (foutHuber(y, np.sqrt(q) * xi, sigma, a) ** 2)
     )
 
 
 @njit(error_model="numpy", fastmath=True)
-def sigma_integral_Huber_single_noise(y, xi, q, m, sigma, delta):
+def sigma_integral_Huber_single_noise(y, xi, q, m, sigma, delta, a):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
         * ZoutBayes_single_noise(y, np.sqrt(eta) * xi, (1 - eta), delta)
-        * DfoutHuber(y, np.sqrt(q) * xi, sigma)
+        * DfoutHuber(y, np.sqrt(q) * xi, sigma, a)
     )
 
 
@@ -355,19 +355,19 @@ def test_fun_down_L1(xi, m, q, sigma, a):
 
 
 def border_plus_Huber(xi, m, q, sigma, a):
-    return np.sqrt(q) / a * xi + (sigma + 1)
+    return np.sqrt(q) * xi + a * (sigma + 1)
 
 
 def border_minus_Huber(xi, m, q, sigma, a):
-    return np.sqrt(q) / a * xi - (sigma + 1)
+    return np.sqrt(q) * xi - a * (sigma + 1)
 
 
 def test_fun_upper_Huber(y, m, q, sigma, a):
-    return a / np.sqrt(q) * (-(sigma + 1) + y)
+    return 1 / np.sqrt(q) * (-a * (sigma + 1) + y)
 
 
 def test_fun_down_Huber(y, m, q, sigma, a):
-    return a / np.sqrt(q) * ((sigma + 1) + y)
+    return 1 / np.sqrt(q) * (a * (sigma + 1) + y)
 
 
 # ------------------
@@ -423,9 +423,7 @@ def q_hat_equation_L2_single_noise(m, q, sigma, delta):
         borders[0][0],
         borders[0][1],
         borders[1][0],
-        borders[1][
-            1
-        ],  # lambda xi: np.sqrt(eta) * xi - size_y, lambda xi: np.sqrt(eta) * xi + size_y
+        borders[1][1],
         args=(q, m, sigma, delta),
     )[0]
 
@@ -456,12 +454,10 @@ def sigma_hat_equation_L2_single_noise(m, q, sigma, delta):
 # ------------------
 
 
-def m_hat_equation_Huber_single_noise(m, q, sigma, delta_small, delta_large, a):
+def m_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
     borders = find_integration_borders_square(
-        lambda y, xi: m_integral_Huber_single_noise(
-            y, xi, q, m, sigma, delta_small, delta_large
-        ),
-        np.sqrt((1 + delta_small)),
+        lambda y, xi: m_integral_Huber_single_noise(y, xi, q, m, sigma, delta, a),
+        np.sqrt((1 + delta)),
         1.0,
     )
 
@@ -484,18 +480,16 @@ def m_hat_equation_Huber_single_noise(m, q, sigma, delta_small, delta_large, a):
             xi_funs[1],
             y_funs[0],
             y_funs[1],
-            args=(q, m, sigma, delta_small, delta_large),
+            args=(q, m, sigma, delta, a),
         )[0]
 
     return integral_value
 
 
-def q_hat_equation_Huber_single_noise(m, q, sigma, delta_small, delta_large, a):
+def q_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
     borders = find_integration_borders_square(
-        lambda y, xi: q_integral_Huber_single_noise(
-            y, xi, q, m, sigma, delta_small, delta_large
-        ),
-        np.sqrt((1 + delta_small)),
+        lambda y, xi: q_integral_Huber_single_noise(y, xi, q, m, sigma, delta, a),
+        np.sqrt((1 + delta)),
         1.0,
     )
 
@@ -518,18 +512,16 @@ def q_hat_equation_Huber_single_noise(m, q, sigma, delta_small, delta_large, a):
             xi_funs[1],
             y_funs[0],
             y_funs[1],
-            args=(q, m, sigma, delta_small, delta_large),
+            args=(q, m, sigma, delta, a),
         )[0]
 
     return integral_value
 
 
-def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta_small, delta_large, a):
+def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
     borders = find_integration_borders_square(
-        lambda y, xi: q_integral_Huber_single_noise(
-            y, xi, q, m, sigma, delta_small, delta_large
-        ),
-        np.sqrt((1 + delta_small)),
+        lambda y, xi: q_integral_Huber_single_noise(y, xi, q, m, sigma, delta, a),
+        np.sqrt((1 + delta)),
         1.0,
     )
 
@@ -547,12 +539,12 @@ def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta_small, delta_large,
     integral_value = 0.0
     for xi_funs, y_funs in zip(domain_xi, domain_y):
         integral_value += dblquad(
-            q_integral_Huber_single_noise,
+            sigma_integral_Huber_single_noise,
             xi_funs[0],
             xi_funs[1],
             y_funs[0],
             y_funs[1],
-            args=(q, m, sigma, delta_small, delta_large),
+            args=(q, m, sigma, delta, a),
         )[0]
 
     return integral_value
@@ -669,6 +661,11 @@ def sigma_hat_equation_L2_double_noise(m, q, sigma, delta_small, delta_large, ep
 
 
 # ------------------
+# L1 equations double noise
+# ------------------
+
+
+# ------------------
 #  Huber equations double noise
 # ------------------
 
@@ -764,7 +761,7 @@ def sigma_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large,
     integral_value = 0.0
     for xi_funs, y_funs in zip(domain_xi, domain_y):
         integral_value += dblquad(
-            q_integral_Huber_double_noise,
+            sigma_integral_Huber_double_noise,
             xi_funs[0],
             xi_funs[1],
             y_funs[0],

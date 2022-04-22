@@ -118,6 +118,7 @@ def domains_double_line_constraint(
     x_test_val_2 = x_fun_upper(-max_range, **args3)  # attention
 
     if x_test_val > max_range:
+        # print("Case 1")
         domain_x = [[-max_range, max_range]] * 3
         domain_y = [
             [lambda x: y_fun_upper(x, **args1), lambda x: max_range],
@@ -126,6 +127,7 @@ def domains_double_line_constraint(
         ]
     elif x_test_val >= 0:
         if x_test_val_2 < -max_range:
+            # print("Case 2.A")
             domain_x = [
                 [-max_range, x_test_val],
                 [-x_test_val, max_range],
@@ -141,6 +143,7 @@ def domains_double_line_constraint(
                 [lambda x: y_fun_lower(x, **args2), lambda x: y_fun_upper(x, **args1)],
             ]
         else:
+            # print("Case 2.B")
             x_test_val_2 = x_fun_upper(-max_range, **args3)
             domain_x = [
                 [x_test_val_2, x_test_val],
@@ -162,6 +165,7 @@ def domains_double_line_constraint(
             ]
     elif x_test_val > -max_range:
         if x_test_val_2 < -max_range:
+            # print("Case 3.A")
             domain_x = [
                 [-max_range, x_test_val],
                 [-x_test_val, max_range],
@@ -177,6 +181,7 @@ def domains_double_line_constraint(
                 [lambda x: -max_range, lambda x: max_range],
             ]
         else:
+            # print("Case 3.B")
             x_test_val_2 = x_fun_upper(-max_range, **args3)
             domain_x = [
                 [x_test_val_2, x_test_val],
@@ -197,6 +202,7 @@ def domains_double_line_constraint(
                 [lambda x: -max_range, lambda x: max_range],
             ]
     else:
+        # print("Case 4")
         domain_x = [[-max_range, max_range]]
         domain_y = [[lambda x: -max_range, lambda x: max_range]]
 

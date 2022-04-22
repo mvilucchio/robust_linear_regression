@@ -108,59 +108,61 @@ def find_coefficients_L2(ys, xs, reg_param):
 
 
 # @nb.njit(error_model="numpy", fastmath=True)
-def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
-    linear_loss = ys - xs_norm @ w
+# def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
+#     linear_loss = ys - xs_norm @ w
 
-    loss = np.sum(np.abs(linear_loss)) + 0.5 * reg_param * np.dot(w, w)
+#     loss = np.sum(np.abs(linear_loss)) + 0.5 * reg_param * np.dot(w, w)
 
-    sign_sample = np.ones_like(linear_loss)
-    sign_sample_mask = linear_loss < 0
-    zero_sample_mask = linear_loss == 0
-    sign_sample[sign_sample_mask] = -1.0
-    sign_sample[zero_sample_mask] = 0.0
+#     sign_sample = np.ones_like(linear_loss)
+#     sign_sample_mask = linear_loss < 0
+#     zero_sample_mask = linear_loss == 0
+#     sign_sample[sign_sample_mask] = -1.0
+#     sign_sample[zero_sample_mask] = 0.0
 
-    gradient = -safe_sparse_dot(sign_sample, xs_norm)
-    gradient += reg_param * w
+#     gradient = -safe_sparse_dot(sign_sample, xs_norm)
+#     gradient += reg_param * w
 
-    return loss, gradient
+#     return loss, gradient
 
 
-def find_coefficients_L1(ys, xs, reg_param, max_iter=15000, tol=1e-6):
+# def find_coefficients_L1(ys, xs, reg_param, max_iter=15000, tol=1e-6):
+#     _, d = xs.shape
+#     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+#     xs_norm = np.divide(xs, np.sqrt(d))
+
+#     bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
+#     bounds[-1][0] = np.finfo(np.float64).eps * 10
+
+#     opt_res = optimize.minimize(
+#         _loss_and_gradient_L1,
+#         w,
+#         method="L-BFGS-B",
+#         jac=True,
+#         args=(xs_norm, ys, reg_param),
+#         options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
+#         bounds=bounds,
+#     )
+
+#     if opt_res.status == 2:
+#         raise ValueError(
+#             "L1Regressor convergence failed: l-BFGS-b solver terminated with %s"
+#             % opt_res.message
+#         )
+
+#     return opt_res.x
+
+
+def find_coefficients_L1(ys, xs, reg_param):
     _, d = xs.shape
-    w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
-    xs_norm = np.divide(xs, np.sqrt(d))
-
-    bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
-    bounds[-1][0] = np.finfo(np.float64).eps * 10
-
-    opt_res = optimize.minimize(
-        _loss_and_gradient_L1,
-        w,
-        method="L-BFGS-B",
-        jac=True,
-        args=(xs_norm, ys, reg_param),
-        options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
-        bounds=bounds,
-    )
-
-    if opt_res.status == 2:
-        raise ValueError(
-            "L1Regressor convergence failed: l-BFGS-b solver terminated with %s"
-            % opt_res.message
-        )
-
-    return opt_res.x
-
-def find_coefficients_L1_cp(ys, xs, reg_param):
-    _, d = xs.shape
-    #w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+    # w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
     xs_norm = np.divide(xs, np.sqrt(d))
     w = cp.Variable(shape=d)
-    obj = cp.Minimize(cp.norm(ys - xs_norm @ w, 1)+0.5*reg_param*cp.sum_squares(w))
+    obj = cp.Minimize(cp.norm(ys - xs_norm @ w, 1) + 0.5 * reg_param * cp.sum_squares(w))
     prob = cp.Problem(obj)
     prob.solve()
-     
+
     return w.value
+
 
 # @nb.njit(error_model="numpy", fastmath=True)
 def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
