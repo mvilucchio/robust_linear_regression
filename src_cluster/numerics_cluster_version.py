@@ -3,6 +3,9 @@ from scipy import optimize
 from sklearn.utils import axis0_safe_slice
 from sklearn.utils.extmath import safe_sparse_dot
 import numba as nb
+from multiprocessing import Pool
+
+# import cvxpy as cp
 
 
 def noise_gen_single(n_samples=1000, delta=1):
@@ -45,6 +48,46 @@ def data_generation(
     return xs, ys, xs_gen, ys_gen, theta_0_teacher
 
 
+def _find_numerical_mean_std(
+    alpha,
+    noise_fun,
+    find_coefficients_fun,
+    n_features,
+    repetitions,
+    noise_fun_kwargs,
+    reg_param,
+    find_coefficients_fun_kwargs,
+):
+    all_gen_errors = np.empty((repetitions,))
+
+    for idx in range(repetitions):
+        xs, ys, _, _, ground_truth_theta = data_generation(
+            noise_fun,
+            n_features=n_features,
+            n_samples=max(int(np.around(n_features * alpha)), 1),
+            n_generalization=1,
+            noise_fun_kwargs=noise_fun_kwargs,
+        )
+
+        estimated_theta = find_coefficients_fun(
+            ys, xs, reg_param, **find_coefficients_fun_kwargs
+        )
+
+        all_gen_errors[idx] = np.divide(
+            np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
+        )
+
+        del xs
+        del ys
+        del ground_truth_theta
+
+    error_mean, error_std = np.mean(all_gen_errors), np.std(all_gen_errors)
+
+    del all_gen_errors
+
+    return error_mean, error_std
+
+
 def generate_different_alpha(
     noise_fun,
     find_coefficients_fun,
@@ -62,39 +105,31 @@ def generate_different_alpha(
         np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
     )
 
-    final_errors_mean = np.empty((n_alpha_points,))
-    final_errors_std = np.empty((n_alpha_points,))
+    errors_mean = np.empty((n_alpha_points,))
+    errors_std = np.empty((n_alpha_points,))
 
-    for jdx, alpha in enumerate(alphas):
-        all_gen_errors = np.empty((repetitions,))
+    inputs = [
+        (
+            a,
+            noise_fun,
+            find_coefficients_fun,
+            n_features,
+            repetitions,
+            noise_fun_kwargs,
+            reg_param,
+            find_coefficients_fun_kwargs,
+        )
+        for a in alphas
+    ]
 
-        for idx in range(repetitions):
-            xs, ys, _, _, ground_truth_theta = data_generation(
-                noise_fun,
-                n_features=n_features,
-                n_samples=max(int(np.around(n_features * alpha)), 1),
-                n_generalization=1,
-                noise_fun_kwargs=noise_fun_kwargs,
-            )
+    with Pool() as pool:
+        results = pool.starmap(_find_numerical_mean_std, inputs)
 
-            estimated_theta = find_coefficients_fun(
-                ys, xs, reg_param, **find_coefficients_fun_kwargs
-            )
+    for idx, r in enumerate(results):
+        errors_mean[idx] = r[0]
+        errors_std[idx] = r[1]
 
-            all_gen_errors[idx] = np.divide(
-                np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
-            )
-
-            del xs
-            del ys
-            del ground_truth_theta
-
-        final_errors_mean[jdx] = np.mean(all_gen_errors)
-        final_errors_std[jdx] = np.std(all_gen_errors)
-
-        del all_gen_errors
-
-    return alphas, final_errors_mean, final_errors_std
+    return alphas, errors_mean, errors_std
 
 
 @nb.njit(error_model="numpy", fastmath=True)
@@ -106,48 +141,60 @@ def find_coefficients_L2(ys, xs, reg_param):
 
 
 # @nb.njit(error_model="numpy", fastmath=True)
-def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
-    linear_loss = ys - xs_norm @ w
+# def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
+#     linear_loss = ys - xs_norm @ w
 
-    loss = np.sum(np.abs(linear_loss)) + 0.5 * reg_param * np.dot(w, w)
+#     loss = np.sum(np.abs(linear_loss)) + 0.5 * reg_param * np.dot(w, w)
 
-    sign_sample = np.ones_like(linear_loss)
-    sign_sample_mask = linear_loss < 0
-    zero_sample_mask = linear_loss == 0
-    sign_sample[sign_sample_mask] = -1.0
-    sign_sample[zero_sample_mask] = 0.0
+#     sign_sample = np.ones_like(linear_loss)
+#     sign_sample_mask = linear_loss < 0
+#     zero_sample_mask = linear_loss == 0
+#     sign_sample[sign_sample_mask] = -1.0
+#     sign_sample[zero_sample_mask] = 0.0
 
-    gradient = -safe_sparse_dot(sign_sample, xs_norm)
-    gradient += reg_param * w
+#     gradient = -safe_sparse_dot(sign_sample, xs_norm)
+#     gradient += reg_param * w
 
-    return loss, gradient
+#     return loss, gradient
 
 
-def find_coefficients_L1(ys, xs, reg_param, max_iter=15000, tol=1e-6):
-    _, d = xs.shape
-    w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
-    xs_norm = np.divide(xs, np.sqrt(d))
+# def find_coefficients_L1(ys, xs, reg_param, max_iter=15000, tol=1e-6):
+#     _, d = xs.shape
+#     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+#     xs_norm = np.divide(xs, np.sqrt(d))
 
-    bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
-    bounds[-1][0] = np.finfo(np.float64).eps * 10
+#     bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
+#     bounds[-1][0] = np.finfo(np.float64).eps * 10
 
-    opt_res = optimize.minimize(
-        _loss_and_gradient_L1,
-        w,
-        method="L-BFGS-B",
-        jac=True,
-        args=(xs_norm, ys, reg_param),
-        options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
-        bounds=bounds,
-    )
+#     opt_res = optimize.minimize(
+#         _loss_and_gradient_L1,
+#         w,
+#         method="L-BFGS-B",
+#         jac=True,
+#         args=(xs_norm, ys, reg_param),
+#         options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
+#         bounds=bounds,
+#     )
 
-    if opt_res.status == 2:
-        raise ValueError(
-            "L1Regressor convergence failed: l-BFGS-b solver terminated with %s"
-            % opt_res.message
-        )
+#     if opt_res.status == 2:
+#         raise ValueError(
+#             "L1Regressor convergence failed: l-BFGS-b solver terminated with %s"
+#             % opt_res.message
+#         )
 
-    return opt_res.x
+#     return opt_res.x
+
+
+# def find_coefficients_L1(ys, xs, reg_param):
+#     _, d = xs.shape
+#     # w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+#     xs_norm = np.divide(xs, np.sqrt(d))
+#     w = cp.Variable(shape=d)
+#     obj = cp.Minimize(cp.norm(ys - xs_norm @ w, 1) + 0.5 * reg_param * cp.sum_squares(w))
+#     prob = cp.Problem(obj)
+#     prob.solve()
+
+#     return w.value
 
 
 # @nb.njit(error_model="numpy", fastmath=True)
