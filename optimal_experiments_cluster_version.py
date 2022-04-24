@@ -11,7 +11,6 @@ if __name__ == "__main__":
     loss_name = "Huber"
 
     experiment_settings = {
-        "loss_name": "Huber",
         "alpha_min": 0.01,
         "alpha_max": 100,
         "alpha_pts": 4,
@@ -19,7 +18,6 @@ if __name__ == "__main__":
         "percentage": percentage,
         "delta_small": delta_small,
         "delta_large": delta_large,
-        "a": 1.0,
         "experiment_type": "reg_param huber_param optimal",
     }
 
