@@ -121,12 +121,12 @@ def optimal_huber_parameter(
 
 
 def _find_optimal_reg_param_and_huber_parameter_gen_error(
-    alpha, double_noise, initial, var_hat_kwargs, fun
+    alpha, double_noise, initial, var_hat_kwargs
 ):
     def minimize_fun(x):
         reg_param, a = x
         var_hat_kwargs.update({"a": a})
-        m, q, sigma = fp.state_equations(
+        m, q, _ = fp.state_equations(
             fp.var_func_L2,
             fp.var_hat_func_Huber_num_double_noise
             if double_noise
@@ -136,7 +136,7 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
             init=initial,
             var_hat_kwargs=var_hat_kwargs,
         )
-        return fun(**{"m": m, "q": q, "sigma": sigma})
+        return 1 + q - 2 * m
 
     bnds = [(SMALLEST_REG_PARAM, None), (SMALLEST_REG_PARAM, None)]
     obj = minimize(minimize_fun, x0=[1.0, 1.0], method="Nelder-Mead", bounds=bnds)
@@ -155,7 +155,6 @@ def optimal_reg_param_and_huber_parameter(
     n_alpha_points=16,
     initial_cond=[0.6, 0.0, 0.0],
     var_hat_kwargs={},
-    fun=lambda m, q, sigma: 1 + q - 2 * m,
 ):
     alphas = np.logspace(
         np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
@@ -166,13 +165,10 @@ def optimal_reg_param_and_huber_parameter(
     reg_param_opt = np.zeros(n_alpha_points)
     a_opt = np.zeros(n_alpha_points)
 
+    inputs = [(a, double_noise, initial, var_hat_kwargs) for a in alphas]
+
     with Pool() as pool:
-        results = pool.map(
-            lambda a: _find_optimal_reg_param_and_huber_parameter_gen_error(
-                a, double_noise, initial, var_hat_kwargs, fun
-            ),
-            alphas,
-        )
+        results = pool.starmap(_find_optimal_reg_param_and_huber_parameter_gen_error, inputs)
 
     for idx, (e, regp, a) in enumerate(results):
         fun_values[idx] = e

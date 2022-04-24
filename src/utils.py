@@ -259,7 +259,7 @@ def experimental_points_runner(**kwargs):
             kwargs["loss_name"],
             values=[
                 num.find_coefficients_L2,
-                num.find_coefficients_L1,
+                -1,
                 num.find_coefficients_Huber,
                 -1,
             ],

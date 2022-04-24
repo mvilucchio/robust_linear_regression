@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.integrate import dblquad
 from numba import njit, vectorize
-from src.integration_utils import (
+from src_cluster.integration_utils_cluster_version import (
     find_integration_borders_square,
     divide_integration_borders_grid,
     domains_double_line_constraint,
+    domains_double_line_constraint_only_inside,
 )
 
 MULT_INTEGRAL = 10
@@ -526,7 +527,7 @@ def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
     )
 
     args = {"m": m, "q": q, "sigma": sigma, "a": a}
-    domain_xi, domain_y = domains_double_line_constraint(
+    domain_xi, domain_y = domains_double_line_constraint_only_inside(
         borders,
         border_plus_Huber,
         border_minus_Huber,
@@ -748,7 +749,7 @@ def sigma_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large,
     )
 
     args = {"m": m, "q": q, "sigma": sigma, "a": a}
-    domain_xi, domain_y = domains_double_line_constraint(
+    domain_xi, domain_y = domains_double_line_constraint_only_inside(
         borders,
         border_plus_Huber,
         border_minus_Huber,

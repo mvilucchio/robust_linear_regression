@@ -16,7 +16,7 @@ if __name__ == "__main__":
     def get_cmap(n, name="hsv"):
         return plt.cm.get_cmap(name, n)
 
-    loss_name = "Huber"
+    loss_name = "L2"
     delta_small, delta_large, percentage = 0.1, 10.0, 0.3
     reg_params = [0.01, 0.1, 1.0]
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
             "loss_name": loss_name,
             "alpha_min": 0.01,
             "alpha_max": 100,
-            "alpha_pts": 16,
+            "alpha_pts": 5,
             "reg_param": reg_param,
             "repetitions": 10,
             "n_features": 500,
@@ -43,7 +43,7 @@ if __name__ == "__main__":
             "loss_name": loss_name,
             "alpha_min": 0.01,
             "alpha_max": 100,
-            "alpha_pts": 40,
+            "alpha_pts": 29,
             "reg_param": reg_param,
             "delta_small": delta_small,
             "delta_large": delta_large,

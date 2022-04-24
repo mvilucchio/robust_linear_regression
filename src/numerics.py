@@ -4,7 +4,7 @@ from sklearn.utils import axis0_safe_slice
 from sklearn.utils.extmath import safe_sparse_dot
 from tqdm.auto import tqdm
 import numba as nb
-import cvxpy as cp
+# import cvxpy as cp
 
 
 def noise_gen_single(n_samples=1000, delta=1):
@@ -152,16 +152,16 @@ def find_coefficients_L2(ys, xs, reg_param):
 #     return opt_res.x
 
 
-def find_coefficients_L1(ys, xs, reg_param):
-    _, d = xs.shape
-    # w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
-    xs_norm = np.divide(xs, np.sqrt(d))
-    w = cp.Variable(shape=d)
-    obj = cp.Minimize(cp.norm(ys - xs_norm @ w, 1) + 0.5 * reg_param * cp.sum_squares(w))
-    prob = cp.Problem(obj)
-    prob.solve()
+# def find_coefficients_L1(ys, xs, reg_param):
+#     _, d = xs.shape
+#     # w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+#     xs_norm = np.divide(xs, np.sqrt(d))
+#     w = cp.Variable(shape=d)
+#     obj = cp.Minimize(cp.norm(ys - xs_norm @ w, 1) + 0.5 * reg_param * cp.sum_squares(w))
+#     prob = cp.Problem(obj)
+#     prob.solve()
 
-    return w.value
+#     return w.value
 
 
 # @nb.njit(error_model="numpy", fastmath=True)

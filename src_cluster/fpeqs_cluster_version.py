@@ -1,5 +1,5 @@
 import numpy as np
-import src.numerical_functions as numfun
+import src_cluster.numerical_functions_cluster_version as numfun
 from multiprocessing import Pool
 
 BLEND = 0.5

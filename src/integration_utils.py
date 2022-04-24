@@ -1,8 +1,10 @@
 import numpy as np
+from scipy.integrate import romb
 
 MULT_INTEGRAL = 10
 TOL_INT = 1e-6
 N_TEST_POINTS = 300
+K_ROMBERG = 5
 
 # if _check_nested_list(square_borders):
 #     max_range = square_borders[0][1]
@@ -95,15 +97,15 @@ def divide_integration_borders_grid(square_borders, proportion=0.5):  # , sides_
     ]
 
     domain_y = [
-        [lambda x: -mid_range, lambda x: mid_range],
-        [lambda x: mid_range, lambda x: max_range],
-        [lambda x: mid_range, lambda x: max_range],
-        [lambda x: -mid_range, lambda x: mid_range],
-        [lambda x: -max_range, lambda x: -mid_range],
-        [lambda x: -max_range, lambda x: -mid_range],
-        [lambda x: -max_range, lambda x: -mid_range],
-        [lambda x: -mid_range, lambda x: mid_range],
-        [lambda x: mid_range, lambda x: max_range],
+        [-mid_range, mid_range],
+        [mid_range, max_range],
+        [mid_range, max_range],
+        [-mid_range, mid_range],
+        [-max_range, -mid_range],
+        [-max_range, -mid_range],
+        [-max_range, -mid_range],
+        [-mid_range, mid_range],
+        [mid_range, max_range],
     ]
 
     return domain_x, domain_y
@@ -208,3 +210,89 @@ def domains_double_line_constraint(
 
     return domain_x, domain_y
 
+
+def domains_double_line_constraint_only_inside(
+    square_borders, y_fun_upper, y_fun_lower, x_fun_upper, args1, args2, args3
+):
+    max_range = square_borders[0][1]
+
+    x_test_val = x_fun_upper(max_range, **args3)
+    x_test_val_2 = x_fun_upper(-max_range, **args3)  # attention
+
+    if x_test_val > max_range:
+        # print("Case 1")
+        domain_x = [[-max_range, max_range]]
+        domain_y = [
+            [lambda x: y_fun_lower(x, **args2), lambda x: y_fun_upper(x, **args1),],
+        ]
+    elif x_test_val >= 0:
+        if x_test_val_2 < -max_range:
+            # print("Case 2.A")
+            domain_x = [
+                [-max_range, -x_test_val],
+                [x_test_val, max_range],
+                [-x_test_val, x_test_val],
+            ]
+            domain_y = [
+                [lambda x: -max_range, lambda x: y_fun_upper(x, **args1)],
+                [lambda x: y_fun_lower(x, **args2), lambda x: max_range],
+                [lambda x: y_fun_lower(x, **args2), lambda x: y_fun_upper(x, **args1)],
+            ]
+        else:
+            # print("Case 2.B")
+            x_test_val_2 = x_fun_upper(-max_range, **args3)
+            domain_x = [
+                [x_test_val_2, -x_test_val],
+                [x_test_val, -x_test_val_2],
+                [-x_test_val, x_test_val],
+            ]
+            domain_y = [
+                [lambda x: -max_range, lambda x: y_fun_upper(x, **args1)],
+                [lambda x: y_fun_lower(x, **args2), lambda x: max_range],
+                [lambda x: y_fun_lower(x, **args2), lambda x: y_fun_upper(x, **args1)],
+            ]
+    elif x_test_val > -max_range:
+        if x_test_val_2 < -max_range:
+            # print("Case 3.A")
+            domain_x = [
+                [-max_range, x_test_val],
+                [-x_test_val, max_range],
+                [x_test_val, -x_test_val],
+            ]
+            domain_y = [
+                [lambda x: -max_range, lambda x: y_fun_upper(x, **args1)],
+                [lambda x: y_fun_lower(x, **args2), lambda x: max_range],
+                [lambda x: -max_range, lambda x: max_range],
+            ]
+        else:
+            # print("Case 3.B")
+            x_test_val_2 = x_fun_upper(-max_range, **args3)
+            domain_x = [
+                [x_test_val_2, x_test_val],
+                [-x_test_val, -x_test_val_2],
+                [x_test_val, -x_test_val],
+            ]
+            domain_y = [
+                [lambda x: -max_range, lambda x: y_fun_upper(x, **args1)],
+                [lambda x: y_fun_lower(x, **args2), lambda x: max_range],
+                [lambda x: -max_range, lambda x: max_range],
+            ]
+    else:
+        # print("Case 4")
+        domain_x = [[-max_range, max_range]]
+        domain_y = [[lambda x: -max_range, lambda x: max_range]]
+
+    return domain_x, domain_y
+
+def double_romb_integration(fun, x_lower, x_upper, y_lower, y_upper, args=[]):
+    x = np.linspace(x_lower, x_upper, 2**K_ROMBERG + 1)
+    y = np.linspace(y_lower, y_upper, 2**K_ROMBERG + 1)
+
+    dx = x[1] - x[0]
+    dy = y[1] - y[0]
+
+    X, Y = np.meshgrid(x, y)
+
+    F = fun(X, Y, *args)
+
+    return romb(romb(F, dy), dx)

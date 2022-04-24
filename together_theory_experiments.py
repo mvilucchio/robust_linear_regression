@@ -1,7 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import src.fpeqs as fpe
-import src.numerics as num
 from tqdm.auto import tqdm
 from src.utils import check_saved, load_file, save_file, experiment_runner
 
@@ -14,7 +12,7 @@ def get_cmap(n, name="hsv"):
     return plt.cm.get_cmap(name, n)
 
 
-loss_name = "Huber"
+loss_name = "L2"
 delta_small, delta_large, percentage = 0.1, 10.0, 0.3
 reg_params = [0.01, 0.1, 1.0]
 
@@ -41,7 +39,7 @@ theory_settings = [
         "loss_name": loss_name,
         "alpha_min": 0.01,
         "alpha_max": 100,
-        "alpha_pts": 21,
+        "alpha_pts": 23,
         "reg_param": reg_param,
         "delta_small": delta_small,
         "delta_large": delta_large,
