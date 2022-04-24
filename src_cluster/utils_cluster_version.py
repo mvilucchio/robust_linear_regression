@@ -1,9 +1,12 @@
 import numpy as np
 import os
 from re import search
-import src.numerics as num
-import src.fpeqs as fpe
-from src.optimal_lambda import optimal_lambda, optimal_reg_param_and_huber_parameter
+import src_cluster.numerics_cluster_version as num
+import src_cluster.fpeqs_cluster_version as fpe
+from src_cluster.optimal_lambda_cluster_version import (
+    optimal_lambda,
+    optimal_reg_param_and_huber_parameter,
+)
 
 
 DATA_FOLDER_PATH = "./data"
@@ -259,7 +262,7 @@ def experimental_points_runner(**kwargs):
             kwargs["loss_name"],
             values=[
                 num.find_coefficients_L2,
-                -1,
+                -1,  # num.find_coefficients_L1,
                 num.find_coefficients_Huber,
                 -1,
             ],
@@ -347,7 +350,6 @@ def theory_curve_runner(**kwargs):
         reg_param=kwargs["reg_param"],
         initial_cond=initial_condition,
         var_hat_kwargs=var_hat_kwargs,
-        verbose=True,
     )
 
     kwargs.update(
@@ -405,7 +407,6 @@ def bayes_optimal_runner(**kwargs):
         reg_param=kwargs["reg_param"],
         initial_cond=initial_condition,
         noise_kwargs=noise_fun_kwargs,
-        verbose=True,
     )
 
     kwargs.update(
@@ -473,7 +474,6 @@ def reg_param_optimal_runner(**kwargs):
         alpha_2=kwargs["alpha_max"],
         n_alpha_points=kwargs["alpha_pts"],
         initial_cond=initial_condition,
-        verbose=True,
         var_hat_kwargs=var_hat_kwargs,
     )
 
@@ -529,7 +529,6 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
         alpha_2=kwargs["alpha_max"],
         n_alpha_points=kwargs["alpha_pts"],
         initial_cond=initial_condition,
-        verbose=True,
         var_hat_kwargs=var_hat_kwargs,
     )
 

@@ -4,7 +4,7 @@ from scipy.integrate import romb
 MULT_INTEGRAL = 10
 TOL_INT = 1e-6
 N_TEST_POINTS = 300
-K_ROMBERG = 5
+K_ROMBERG = 10
 
 # if _check_nested_list(square_borders):
 #     max_range = square_borders[0][1]
