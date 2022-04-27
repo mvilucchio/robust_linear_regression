@@ -5,9 +5,12 @@ from src.integration_utils import (
     find_integration_borders_square,
     divide_integration_borders_grid,
     domains_double_line_constraint,
+    domains_double_line_constraint_only_inside,
 )
 
 MULT_INTEGRAL = 10
+EPSABS = 1e-9
+EPSREL = 1e-9
 
 
 @njit(error_model="numpy", fastmath=True)
@@ -388,6 +391,8 @@ def q_hat_equation_BO_single_noise(m, q, sigma, delta):
         borders[1][0],
         borders[1][1],
         args=(q, m, sigma, delta),
+        epsabs=EPSABS,
+        epsrel=EPSREL
     )[0]
 
 
@@ -409,6 +414,8 @@ def m_hat_equation_L2_single_noise(m, q, sigma, delta):
         borders[1][0],
         borders[1][1],
         args=(q, m, sigma, delta),
+        epsabs=EPSABS,
+        epsrel=EPSREL
     )[0]
 
 
@@ -425,6 +432,8 @@ def q_hat_equation_L2_single_noise(m, q, sigma, delta):
         borders[1][0],
         borders[1][1],
         args=(q, m, sigma, delta),
+        epsabs=EPSABS,
+        epsrel=EPSREL
     )[0]
 
 
@@ -441,6 +450,8 @@ def sigma_hat_equation_L2_single_noise(m, q, sigma, delta):
         borders[1][0],
         borders[1][1],
         args=(q, m, sigma, delta),
+        epsabs=EPSABS,
+        epsrel=EPSREL
     )[0]
 
 
@@ -481,6 +492,8 @@ def m_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta, a),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -513,6 +526,8 @@ def q_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta, a),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -526,7 +541,7 @@ def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
     )
 
     args = {"m": m, "q": q, "sigma": sigma, "a": a}
-    domain_xi, domain_y = domains_double_line_constraint(
+    domain_xi, domain_y = domains_double_line_constraint_only_inside(
         borders,
         border_plus_Huber,
         border_minus_Huber,
@@ -545,6 +560,8 @@ def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta, a),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -575,6 +592,8 @@ def q_hat_equation_BO_double_noise(m, q, sigma, delta_small, delta_large, eps):
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -605,6 +624,8 @@ def m_hat_equation_L2_double_noise(m, q, sigma, delta_small, delta_large, eps):
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -630,6 +651,8 @@ def q_hat_equation_L2_double_noise(m, q, sigma, delta_small, delta_large, eps):
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -655,6 +678,8 @@ def sigma_hat_equation_L2_double_noise(m, q, sigma, delta_small, delta_large, ep
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -699,6 +724,8 @@ def m_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large, eps
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps, a),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -733,6 +760,8 @@ def q_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large, eps
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps, a),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value
@@ -748,7 +777,7 @@ def sigma_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large,
     )
 
     args = {"m": m, "q": q, "sigma": sigma, "a": a}
-    domain_xi, domain_y = domains_double_line_constraint(
+    domain_xi, domain_y = domains_double_line_constraint_only_inside(
         borders,
         border_plus_Huber,
         border_minus_Huber,
@@ -767,6 +796,8 @@ def sigma_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large,
             y_funs[0],
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps, a),
+            epsabs=EPSABS,
+            epsrel=EPSREL
         )[0]
 
     return integral_value

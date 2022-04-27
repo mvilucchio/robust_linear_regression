@@ -1,9 +1,10 @@
 import numpy as np
-from tqdm.auto import tqdm
 import src.numerical_functions as numfun
+from multiprocessing import Pool
+# from mpi4py.futures import MPIPoolExecutor as Pool
 
 BLEND = 0.5
-TOL_FPE = 1e-6
+TOL_FPE = 5e-9
 
 
 def state_equations(
@@ -39,6 +40,20 @@ def state_equations(
     return m, q, sigma
 
 
+def _find_fixed_point(
+    alpha, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs
+):
+    m, q, sigma = state_equations(
+        var_func,
+        var_hat_func,
+        reg_param=reg_param,
+        alpha=alpha,
+        init=initial_cond,
+        var_hat_kwargs=var_hat_kwargs,
+    )
+    return m, q, sigma
+
+
 def different_alpha_observables_fpeqs(
     var_func,
     var_hat_func,
@@ -48,7 +63,6 @@ def different_alpha_observables_fpeqs(
     n_alpha_points=16,
     reg_param=0.1,
     initial_cond=[0.6, 0.0, 0.0],
-    verbose=False,
     var_hat_kwargs={},
 ):
     n_observables = len(funs)
@@ -57,18 +71,15 @@ def different_alpha_observables_fpeqs(
     )
     out_values = np.empty((n_observables, n_alpha_points))
 
-    for idx, alpha in enumerate(
-        tqdm(alphas, desc="alpha", disable=not verbose, leave=False)
-    ):
-        m, q, sigma = state_equations(
-            var_func,
-            var_hat_func,
-            reg_param=reg_param,
-            alpha=alpha,
-            init=initial_cond,
-            var_hat_kwargs=var_hat_kwargs,
-        )
+    inputs = [
+        (a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs)
+        for a in alphas
+    ]
 
+    with Pool() as pool:
+        results = pool.starmap(_find_fixed_point, inputs)
+
+    for idx, (m, q, sigma) in enumerate(results):
         fixed_point_sols = {"m": m, "q": q, "sigma": sigma}
         for jdx, f in enumerate(funs):
             out_values[jdx, idx] = f(**fixed_point_sols)
@@ -76,6 +87,39 @@ def different_alpha_observables_fpeqs(
     out_list = [out_values[idx, :] for idx in range(len(funs))]
     return alphas, out_list
 
+
+def different_reg_param_gen_error(
+    var_func,
+    var_hat_func,
+    funs=[lambda m, q, sigma: 1 + q - 2 * m],
+    reg_param_1=0.01,
+    reg_param_2=100,
+    n_reg_param_points=16,
+    alpha=0.1,
+    initial_cond=[0.6, 0.0, 0.0],
+    var_hat_kwargs={},
+):
+    n_observables = len(funs)
+    reg_params = np.logspace(
+        np.log(reg_param_1) / np.log(10), np.log(reg_param_2) / np.log(10), n_reg_param_points
+    )
+    out_values = np.empty((n_observables, n_reg_param_points))
+
+    inputs = [
+        (alpha, var_func, var_hat_func, rp, initial_cond, var_hat_kwargs)
+        for rp in reg_params
+    ]
+
+    with Pool() as pool:
+        results = pool.starmap(_find_fixed_point, inputs)
+
+    for idx, (m, q, sigma) in enumerate(results):
+        fixed_point_sols = {"m": m, "q": q, "sigma": sigma}
+        for jdx, f in enumerate(funs):
+            out_values[jdx, idx] = f(**fixed_point_sols)
+
+    out_list = [out_values[idx, :] for idx in range(len(funs))]
+    return reg_params, out_list
 
 # --------------------------
 
@@ -94,6 +138,11 @@ def var_hat_func_BO_single_noise(m, q, sigma, alpha, delta):
 
 def var_hat_func_BO_num_single_noise(m, q, sigma, alpha, delta):
     q_hat = alpha * numfun.q_hat_equation_BO_single_noise(m, q, sigma, delta)
+    return q_hat, q_hat, q_hat
+
+
+def var_hat_func_BO_double_noise(m, q, sigma, alpha, delta_small, delta_large, percentage):
+    q_hat = alpha * (1 + (1 - percentage) * delta_large + percentage * delta_small - q) / ((1 + delta_small - q) * (1 + delta_large - q))
     return q_hat, q_hat, q_hat
 
 
@@ -129,6 +178,16 @@ def var_hat_func_L2_num_single_noise(m, q, sigma, alpha, delta):
     m_hat = alpha * numfun.m_hat_equation_L2_single_noise(m, q, sigma, delta)
     q_hat = alpha * numfun.q_hat_equation_L2_single_noise(m, q, sigma, delta)
     sigma_hat = -alpha * numfun.sigma_hat_equation_L2_single_noise(m, q, sigma, delta)
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_L2_double_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage
+):
+    delta_eff = (1 - percentage) * delta_small + percentage * delta_large
+    m_hat = alpha / (1 + sigma)
+    q_hat = alpha * (1 + q + delta_eff - 2 * np.abs(m)) / ((1 + sigma) ** 2)
+    sigma_hat = alpha / (1 + sigma)
     return m_hat, q_hat, sigma_hat
 
 

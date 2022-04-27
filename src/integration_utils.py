@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.integrate import romb
+import unittest
 
 MULT_INTEGRAL = 10
 TOL_INT = 1e-6
-N_TEST_POINTS = 300
-K_ROMBERG = 5
+N_TEST_POINTS = 100
+K_ROMBERG = 10
 
 # if _check_nested_list(square_borders):
 #     max_range = square_borders[0][1]
@@ -283,6 +284,7 @@ def domains_double_line_constraint_only_inside(
         domain_y = [[lambda x: -max_range, lambda x: max_range]]
 
     return domain_x, domain_y
+
 
 def double_romb_integration(fun, x_lower, x_upper, y_lower, y_upper, args=[]):
     x = np.linspace(x_lower, x_upper, 2**K_ROMBERG + 1)

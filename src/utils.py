@@ -3,7 +3,10 @@ import os
 from re import search
 import src.numerics as num
 import src.fpeqs as fpe
-from src.optimal_lambda import optimal_lambda, optimal_reg_param_and_huber_parameter
+from src.optimal_lambda import (
+    optimal_lambda,
+    optimal_reg_param_and_huber_parameter,
+)
 
 
 DATA_FOLDER_PATH = "./data"
@@ -73,7 +76,7 @@ def _loss_type_chose(test_string, values=[0, 1, 2, 3, 4, 5, 6, -1]):
 def file_name_generator(**kwargs):
     experiment_code = _exp_type_choser(kwargs["experiment_type"])
 
-    if not (experiment_code == 5 or experiment_code == 6):
+    if not (experiment_code == 2 or experiment_code == 5 or experiment_code == 6):
         if kwargs["loss_name"] == "Huber":
             kwargs["loss_name"] += " " + str(kwargs.get("a", 1.0))
 
@@ -259,7 +262,7 @@ def experimental_points_runner(**kwargs):
             kwargs["loss_name"],
             values=[
                 num.find_coefficients_L2,
-                -1,
+                -1,  # num.find_coefficients_L1,
                 num.find_coefficients_Huber,
                 -1,
             ],
@@ -310,7 +313,7 @@ def theory_curve_runner(**kwargs):
                 break
 
         var_functions = [
-            fpe.var_hat_func_L2_num_double_noise,
+            fpe.var_hat_func_L2_double_noise,
             -1,
             fpe.var_hat_func_Huber_num_double_noise,
             -1,
@@ -347,7 +350,6 @@ def theory_curve_runner(**kwargs):
         reg_param=kwargs["reg_param"],
         initial_cond=initial_condition,
         var_hat_kwargs=var_hat_kwargs,
-        verbose=True,
     )
 
     kwargs.update(
@@ -358,64 +360,6 @@ def theory_curve_runner(**kwargs):
 
 
 def bayes_optimal_runner(**kwargs):
-    _, file_path = check_saved(**kwargs)
-
-    double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
-
-    if double_noise:
-        noise_fun_kwargs = {
-            "delta_small": kwargs["delta_small"],
-            "delta_large": kwargs["delta_large"],
-            "percentage": kwargs["percentage"],
-        }
-
-        delta_small = kwargs["delta_small"]
-        delta_large = kwargs["delta_large"]
-
-        while True:
-            m = 0.89 * np.random.random() + 0.1
-            q = 0.89 * np.random.random() + 0.1
-            sigma = 0.89 * np.random.random() + 0.1
-            if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
-                initial_condition = [m, q, sigma]
-                break
-
-        var_function = fpe.var_hat_func_BO_num_double_noise
-    else:
-        noise_fun_kwargs = {"delta": kwargs["delta"]}
-
-        delta = kwargs["delta"]
-
-        while True:
-            m = 0.89 * np.random.random() + 0.1
-            q = 0.89 * np.random.random() + 0.1
-            sigma = 0.89 * np.random.random() + 0.1
-            if np.square(m) < q + delta * q:
-                initial_condition = [m, q, sigma]
-                break
-
-        var_function = fpe.var_hat_func_BO_num_single_noise
-
-    alphas, (errors) = fpe.different_alpha_observables_fpeqs(
-        fpe.var_func_BO,
-        var_function,
-        alpha_1=kwargs["alpha_min"],
-        alpha_2=kwargs["alpha_max"],
-        n_alpha_points=kwargs["alpha_pts"],
-        reg_param=kwargs["reg_param"],
-        initial_cond=initial_condition,
-        noise_kwargs=noise_fun_kwargs,
-        verbose=True,
-    )
-
-    kwargs.update(
-        {"file_path": file_path, "alphas": alphas, "errors": errors,}
-    )
-
-    save_file(**kwargs)
-
-
-def reg_param_optimal_runner(**kwargs):
     _, file_path = check_saved(**kwargs)
 
     double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
@@ -438,8 +382,64 @@ def reg_param_optimal_runner(**kwargs):
                 initial_condition = [m, q, sigma]
                 break
 
+        var_function = fpe.var_hat_func_BO_double_noise
+    else:
+        var_hat_kwargs = {"delta": kwargs["delta"]}
+
+        delta = kwargs["delta"]
+
+        while True:
+            m = 0.89 * np.random.random() + 0.1
+            q = 0.89 * np.random.random() + 0.1
+            sigma = 0.89 * np.random.random() + 0.1
+            if np.square(m) < q + delta * q:
+                initial_condition = [m, q, sigma]
+                break
+
+        var_function = fpe.var_hat_func_BO_single_noise
+
+    alphas, (errors, ) = fpe.different_alpha_observables_fpeqs(
+        fpe.var_func_BO,
+        var_function,
+        alpha_1=kwargs["alpha_min"],
+        alpha_2=kwargs["alpha_max"],
+        n_alpha_points=kwargs["alpha_pts"],
+        initial_cond=initial_condition,
+        var_hat_kwargs=var_hat_kwargs,
+    )
+
+    kwargs.update(
+        {"file_path": file_path, "alphas": alphas, "errors": errors,}
+    )
+
+    save_file(**kwargs)
+
+
+def reg_param_optimal_runner(**kwargs):
+    _, file_path = check_saved(**kwargs)
+
+    double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
+    
+    if double_noise:
+        var_hat_kwargs = {
+            "delta_small": kwargs["delta_small"],
+            "delta_large": kwargs["delta_large"],
+            "percentage": kwargs["percentage"],
+        }
+
+        delta_small = kwargs["delta_small"]
+        delta_large = kwargs["delta_large"]
+
+        while True:
+            m = 0.89 * np.random.random() + 0.1
+            q = 0.89 * np.random.random() + 0.1
+            sigma = 0.89 * np.random.random() + 0.1
+            if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
+                initial_condition = [m, q, sigma]
+                break
+
         var_functions = [
-            fpe.var_hat_func_L2_num_double_noise,
+            fpe.var_hat_func_L2_double_noise,
             -1,
             fpe.var_hat_func_Huber_num_double_noise,
             -1,
@@ -473,7 +473,6 @@ def reg_param_optimal_runner(**kwargs):
         alpha_2=kwargs["alpha_max"],
         n_alpha_points=kwargs["alpha_pts"],
         initial_cond=initial_condition,
-        verbose=True,
         var_hat_kwargs=var_hat_kwargs,
     )
 
@@ -529,7 +528,6 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
         alpha_2=kwargs["alpha_max"],
         n_alpha_points=kwargs["alpha_pts"],
         initial_cond=initial_condition,
-        verbose=True,
         var_hat_kwargs=var_hat_kwargs,
     )
 

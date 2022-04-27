@@ -1,10 +1,37 @@
 import numpy as np
 from scipy.optimize import minimize, Bounds
-from tqdm.auto import tqdm
 import src.fpeqs as fp
+from multiprocessing import Pool
+# from mpi4py.futures import MPIPoolExecutor as Pool
 
 SMALLEST_REG_PARAM = 1e-3
 SMALLEST_HUBER_PARAM = 1e-3
+MAX_ITER = 2500
+FTOL = 1e-8
+
+
+def _find_optimal_reg_param_gen_error(
+    alpha, var_func, var_hat_func, initial_cond, var_hat_kwargs, inital_value
+):
+    def minimize_fun(reg_param):
+        m, q, _ = fp.state_equations(
+            var_func,
+            var_hat_func,
+            reg_param=reg_param,
+            alpha=alpha,
+            init=initial_cond,
+            var_hat_kwargs=var_hat_kwargs,
+        )
+        return 1 + q - 2 * m
+
+    # bnds = [(SMALLEST_REG_PARAM, None)]
+    obj = minimize(minimize_fun, x0=inital_value, method="Nelder-Mead", options={"ftol" : FTOL}) # bounds=bnds, , "maxiter":MAX_ITER
+    if obj.success:
+        fun_val = obj.fun
+        reg_param_opt = obj.x
+        return fun_val, reg_param_opt
+    else:
+        raise RuntimeError("Minima could not be found.")
 
 
 def optimal_lambda(
@@ -14,43 +41,52 @@ def optimal_lambda(
     alpha_2=100,
     n_alpha_points=16,
     initial_cond=[0.6, 0.0, 0.0],
-    verbose=False,
     var_hat_kwargs={},
-    fun=lambda m, q, sigma: 1 + q - 2 * m,
 ):
-
     alphas = np.logspace(
         np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
     )
 
-    initial = initial_cond
-    error_theory = np.zeros(n_alpha_points)
+    fun_values = np.zeros(n_alpha_points)
     reg_param_opt = np.zeros(n_alpha_points)
+    init_param = 0.1 * np.random.random() + 0.1
+    # init_param = []
 
-    for i, alpha in enumerate(
-        tqdm(alphas, desc="alpha", disable=not verbose, leave=False)
-    ):
+    inputs = [(a, var_func, var_hat_func, initial_cond, var_hat_kwargs, init_param) for a in alphas]
 
-        def error_func(reg_param):
-            m, q, sigma = fp.state_equations(
-                var_func,
-                var_hat_func,
-                reg_param=reg_param,
-                alpha=alpha,
-                init=initial,
-                var_hat_kwargs=var_hat_kwargs,
-            )
-            return fun(**{"m": m, "q": q, "sigma": sigma})
+    with Pool() as pool:
+        results = pool.starmap(_find_optimal_reg_param_gen_error, inputs)
 
-        bnds = [(SMALLEST_REG_PARAM, None)]
-        obj = minimize(error_func, x0=1.0, method="Nelder-Mead", bounds=bnds)
-        if obj.success:
-            error_theory[i] = obj.fun
-            reg_param_opt[i] = obj.x
-        else:
-            raise RuntimeError("Minima could not be found.")
+    for idx, (e, regp) in enumerate(results):
+        fun_values[idx] = e
+        reg_param_opt[idx] = regp
 
-    return alphas, error_theory, reg_param_opt
+    return alphas, fun_values, reg_param_opt
+
+
+def _find_optimal_huber_parameter_gen_error(
+    alpha, double_noise, reg_param, initial, var_hat_kwargs, inital_value
+):
+    def error_func(a):
+        var_hat_kwargs.update({"a": a})
+        m, q, _ = fp.state_equations(
+            fp.var_func_L2,
+            fp.var_hat_func_Huber_num_double_noise if double_noise else fp.var_hat_func_Huber_num_single_noise,
+            reg_param=reg_param,
+            alpha=alpha,
+            init=initial,
+            var_hat_kwargs=var_hat_kwargs,
+        )
+        return 1 + q - 2 * m
+
+    # bnds = [(SMALLEST_HUBER_PARAM, None)]
+    obj = minimize(error_func, x0=inital_value, method="Nelder-Mead", options={"maxiter": MAX_ITER}) # bounds=bnds, 
+    if obj.success:
+        fun_val = obj.fun
+        a_opt = obj.x
+        return fun_val, a_opt
+    else:
+        raise RuntimeError("Minima could not be found.")
 
 
 def optimal_huber_parameter(
@@ -60,45 +96,54 @@ def optimal_huber_parameter(
     alpha_2=100,
     n_alpha_points=16,
     initial_cond=[0.6, 0.0, 0.0],
-    verbose=False,
-    noise_kwargs={},
-    fun=lambda m, q, sigma: 1 + q - 2 * m,
+    var_hat_kwargs={},
 ):
 
     alphas = np.logspace(
         np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
     )
 
-    initial = initial_cond
-    error_theory = np.zeros(n_alpha_points)
+    fun_values = np.zeros(n_alpha_points)
     a_opt = np.zeros(n_alpha_points)
 
-    for i, alpha in enumerate(
-        tqdm(alphas, desc="alpha", disable=not verbose, leave=False)
-    ):
+    inputs = [(a, double_noise, reg_param, initial_cond, var_hat_kwargs, 1.0) for a in alphas]
 
-        def error_func(a):
-            noise_kwargs.update({"a": a})
-            m, q, sigma = fp.state_equations(
-                fp.var_func_L2,
-                fp.var_hat_func_Huber_num_double_noise
-                if double_noise
-                else fp.var_hat_func_Huber_num_single_noise,
-                reg_param=reg_param,
-                alpha=alpha,
-                init=initial,
-                noise_kwargs=noise_kwargs,
-            )
-            return fun(**{"m": m, "q": q, "sigma": sigma})
+    with Pool() as pool:
+        results = pool.starmap(_find_optimal_huber_parameter_gen_error, inputs)
 
-        obj = minimize(error_func, x0=1.0, method="Nelder-Mead")
-        if obj.success:
-            error_theory[i] = obj.fun
-            a_opt[i] = obj.x
-        else:
-            raise RuntimeError("Minima could not be found.")
+    for idx, (e, a) in enumerate(results):
+        fun_values[idx] = e
+        a_opt[idx] = a
 
-    return alphas, error_theory, a_opt
+    return alphas, fun_values, a_opt
+
+
+def _find_optimal_reg_param_and_huber_parameter_gen_error(
+    alpha, double_noise, initial, var_hat_kwargs, inital_values
+):
+    def minimize_fun(x):
+        reg_param, a = x
+        var_hat_kwargs.update({"a": a})
+        m, q, _ = fp.state_equations(
+            fp.var_func_L2,
+            fp.var_hat_func_Huber_num_double_noise
+            if double_noise
+            else fp.var_hat_func_Huber_num_single_noise,
+            reg_param=reg_param,
+            alpha=alpha,
+            init=initial,
+            var_hat_kwargs=var_hat_kwargs,
+        )
+        return 1 + q - 2 * m
+
+    # bnds = [(SMALLEST_REG_PARAM, None), (SMALLEST_REG_PARAM, None)]
+    obj = minimize(minimize_fun, x0=inital_values, method="Nelder-Mead", options={"maxiter": MAX_ITER}) #, bounds=bnds
+    if obj.success:
+        fun_val = obj.fun
+        reg_param_opt, a_opt = obj.x
+        return fun_val, reg_param_opt, a_opt
+    else:
+        raise RuntimeError("Minima could not be found.")
 
 
 def optimal_reg_param_and_huber_parameter(
@@ -107,44 +152,28 @@ def optimal_reg_param_and_huber_parameter(
     alpha_2=100,
     n_alpha_points=16,
     initial_cond=[0.6, 0.0, 0.0],
-    verbose=False,
     var_hat_kwargs={},
-    fun=lambda m, q, sigma: 1 + q - 2 * m,
 ):
     alphas = np.logspace(
         np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
     )
 
     initial = initial_cond
-    error_theory = np.zeros(n_alpha_points)
+    fun_values = np.zeros(n_alpha_points)
     reg_param_opt = np.zeros(n_alpha_points)
     a_opt = np.zeros(n_alpha_points)
 
-    for i, alpha in enumerate(
-        tqdm(alphas, desc="alpha", disable=not verbose, leave=False)
-    ):
+    inital_reg_param = 0.1 * np.random.random() + 0.1
+    inital_hub_param = 0.1 * np.random.random() + 0.1
 
-        def error_func(x):
-            reg_param, a = x
-            var_hat_kwargs.update({"a": a})
-            m, q, sigma = fp.state_equations(
-                fp.var_func_L2,
-                fp.var_hat_func_Huber_num_double_noise
-                if double_noise
-                else fp.var_hat_func_Huber_num_single_noise,
-                reg_param=reg_param,
-                alpha=alpha,
-                init=initial,
-                var_hat_kwargs=var_hat_kwargs,
-            )
-            return fun(**{"m": m, "q": q, "sigma": sigma})
+    inputs = [(a, double_noise, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param]) for a in alphas]
 
-        bnds = [(SMALLEST_REG_PARAM, None), (SMALLEST_REG_PARAM, None)]
-        obj = minimize(error_func, x0=[1.0, 1.0], method="Nelder-Mead", bounds=bnds)
-        if obj.success:
-            error_theory[i] = obj.fun
-            reg_param_opt[i], a_opt[i] = obj.x
-        else:
-            raise RuntimeError("Minima could not be found.")
+    with Pool() as pool:
+        results = pool.starmap(_find_optimal_reg_param_and_huber_parameter_gen_error, inputs)
 
-    return alphas, error_theory, reg_param_opt, a_opt
+    for idx, (e, regp, a) in enumerate(results):
+        fun_values[idx] = e
+        reg_param_opt[idx] = regp
+        a_opt[idx] = a
+
+    return alphas, fun_values, reg_param_opt, a_opt

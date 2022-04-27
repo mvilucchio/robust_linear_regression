@@ -2,13 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import src.fpeqs as fpe
 import src.numerics as num
+import src.plotting_utils as pu
 from tqdm.auto import tqdm
 from src.utils import check_saved, load_file, save_file, experiment_runner
 
+save = True
 random_number = np.random.randint(0, 100)
 
 names_cm = ["Purples", "Blues", "Greens", "Oranges", "Greys"]
-
 
 def get_cmap(n, name="hsv"):
     return plt.cm.get_cmap(name, n)
@@ -86,6 +87,8 @@ for idx, (exp_dict, theory_dict) in enumerate(
 
 # ------------
 
+pu.initialization_mpl()
+
 fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
 for idx, (al_n, err_m, err_s, al_t, err_t, a) in enumerate(
@@ -124,16 +127,9 @@ ax.set_xlabel(r"$\alpha$")
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlim([0.009, 110])
-ax.minorticks_on()
-ax.grid(True, which="both")
 ax.legend()
 
-fig.savefig(
-    "./imgs/{} - together - double noise - different a - {}.png".format(
-        loss_name, random_number
-    ),
-    format="png",
-    dpi=150,
-)
+if save:
+    pu.save_plot(fig, "{}_together_different_a_{:d}".format(loss_name, random_number))
 
 plt.show()

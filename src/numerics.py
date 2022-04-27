@@ -2,8 +2,10 @@ import numpy as np
 from scipy import optimize
 from sklearn.utils import axis0_safe_slice
 from sklearn.utils.extmath import safe_sparse_dot
-from tqdm.auto import tqdm
 import numba as nb
+from multiprocessing import Pool
+# from mpi4py.futures import MPIPoolExecutor as Pool
+
 # import cvxpy as cp
 
 
@@ -47,6 +49,46 @@ def data_generation(
     return xs, ys, xs_gen, ys_gen, theta_0_teacher
 
 
+def _find_numerical_mean_std(
+    alpha,
+    noise_fun,
+    find_coefficients_fun,
+    n_features,
+    repetitions,
+    noise_fun_kwargs,
+    reg_param,
+    find_coefficients_fun_kwargs,
+):
+    all_gen_errors = np.empty((repetitions,))
+
+    for idx in range(repetitions):
+        xs, ys, _, _, ground_truth_theta = data_generation(
+            noise_fun,
+            n_features=n_features,
+            n_samples=max(int(np.around(n_features * alpha)), 1),
+            n_generalization=1,
+            noise_fun_kwargs=noise_fun_kwargs,
+        )
+
+        estimated_theta = find_coefficients_fun(
+            ys, xs, reg_param, **find_coefficients_fun_kwargs
+        )
+
+        all_gen_errors[idx] = np.divide(
+            np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
+        )
+
+        del xs
+        del ys
+        del ground_truth_theta
+
+    error_mean, error_std = np.mean(all_gen_errors), np.std(all_gen_errors)
+
+    del all_gen_errors
+
+    return error_mean, error_std
+
+
 def generate_different_alpha(
     noise_fun,
     find_coefficients_fun,
@@ -64,39 +106,31 @@ def generate_different_alpha(
         np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
     )
 
-    final_errors_mean = np.empty((n_alpha_points,))
-    final_errors_std = np.empty((n_alpha_points,))
+    errors_mean = np.empty((n_alpha_points,))
+    errors_std = np.empty((n_alpha_points,))
 
-    for jdx, alpha in enumerate(tqdm(alphas, desc="alpha", leave=False)):
-        all_gen_errors = np.empty((repetitions,))
+    inputs = [
+        (
+            a,
+            noise_fun,
+            find_coefficients_fun,
+            n_features,
+            repetitions,
+            noise_fun_kwargs,
+            reg_param,
+            find_coefficients_fun_kwargs,
+        )
+        for a in alphas
+    ]
 
-        for idx in tqdm(range(repetitions), desc="reps", leave=False):
-            xs, ys, _, _, ground_truth_theta = data_generation(
-                noise_fun,
-                n_features=n_features,
-                n_samples=max(int(np.around(n_features * alpha)), 1),
-                n_generalization=1,
-                noise_fun_kwargs=noise_fun_kwargs,
-            )
+    with Pool() as pool:
+        results = pool.starmap(_find_numerical_mean_std, inputs)
 
-            estimated_theta = find_coefficients_fun(
-                ys, xs, reg_param, **find_coefficients_fun_kwargs
-            )
+    for idx, r in enumerate(results):
+        errors_mean[idx] = r[0]
+        errors_std[idx] = r[1]
 
-            all_gen_errors[idx] = np.divide(
-                np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
-            )
-
-            del xs
-            del ys
-            del ground_truth_theta
-
-        final_errors_mean[jdx] = np.mean(all_gen_errors)
-        final_errors_std[jdx] = np.std(all_gen_errors)
-
-        del all_gen_errors
-
-    return alphas, final_errors_mean, final_errors_std
+    return alphas, errors_mean, errors_std
 
 
 @nb.njit(error_model="numpy", fastmath=True)
