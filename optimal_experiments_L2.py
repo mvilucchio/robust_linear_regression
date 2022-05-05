@@ -1,7 +1,5 @@
 from src.utils import experiment_runner
-import sys
 from itertools import product
-from tqdm.auto import tqdm
 
 if __name__ == "__main__":
 
@@ -15,14 +13,14 @@ if __name__ == "__main__":
             "alpha_min": 0.01,
             "alpha_max": 100,
             "alpha_pts": 36,
-            # "delta": d,
             "percentage": p,
             "delta_small": 0.1,
             "delta_large": dl,
+            "beta": 0.0,
             "experiment_type": "reg_param optimal",
         }
         for dl, p in product(deltas_large, percentages)
     ]
 
-    for dic in tqdm(experiment_settings):
+    for dic in experiment_settings:
         experiment_runner(**dic)

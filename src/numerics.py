@@ -9,53 +9,83 @@ from multiprocessing import Pool
 # import cvxpy as cp
 
 
-def noise_gen_single(n_samples=1000, delta=1):
-    error_sample = np.sqrt(delta) * np.random.normal(
-        loc=0.0, scale=1.0, size=(n_samples,)
-    )
-    return error_sample
+def measure_gen_single(generalization, teacher_vector, xs, delta=1):
+    n_samples, n_features = xs.shape
+    w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
+    if generalization:
+        ys = w_xs
+    else:
+        error_sample = np.sqrt(delta) * np.random.normal(
+            loc=0.0, scale=1.0, size=(n_samples,)
+        )
+        ys = w_xs + error_sample
+    return ys
 
 
-def noise_gen_double(n_samples=1000, delta_small=1, delta_large=10, percentage=0.1):
-    choice = np.random.choice([0, 1], p=[1 - percentage, percentage], size=(n_samples,))
-    error_sample = np.empty((n_samples, 2))
-    error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(
-        loc=0.0, scale=1.0, size=(n_samples,)
-    )
-    error_sample[:, 1] = np.sqrt(delta_large) * np.random.normal(
-        loc=0.0, scale=1.0, size=(n_samples,)
-    )
-    total_error = np.where(choice, error_sample[:, 1], error_sample[:, 0])
-    return total_error
+def measure_gen_double(generalization, teacher_vector, xs, delta_small=1, delta_large=10, percentage=0.1):
+    n_samples, n_features = xs.shape
+    w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
+    if generalization:
+        ys = w_xs
+    else:
+        choice = np.random.choice([0, 1], p=[1 - percentage, percentage], size=(n_samples,))
+        error_sample = np.empty((n_samples, 2))
+        error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(
+            loc=0.0, scale=1.0, size=(n_samples,)
+        )
+        error_sample[:, 1] = np.sqrt(delta_large) * np.random.normal(
+            loc=0.0, scale=1.0, size=(n_samples,)
+        )
+        total_error = np.where(choice, error_sample[:, 1], error_sample[:, 0])
+        ys = w_xs + total_error
+    return ys
+
+
+def measure_gen_decorrelated(generalization, teacher_vector, xs, delta_small=1, delta_large=10, percentage=0.1, beta=0.0):
+    n_samples, n_features = xs.shape
+    w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
+    if generalization:
+        ys = w_xs
+    else:
+        choice = np.random.choice([0, 1], p=[1 - percentage, percentage], size=(n_samples,))
+        error_sample = np.empty((n_samples, 2))
+        error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(
+            loc=0.0, scale=1.0, size=(n_samples,)
+        )
+        error_sample[:, 1] = np.sqrt(delta_large) * np.random.normal(
+            loc=0.0, scale=1.0, size=(n_samples,)
+        )
+        total_error = np.where(choice, error_sample[:, 1], error_sample[:, 0])
+        factor_in_front = np.where(choice, beta, 1.0)
+        ys = factor_in_front * w_xs + total_error
+    return ys
 
 
 def data_generation(
-    noise_fun,
+    measure_fun,
     n_features=100,
     n_samples=1000,
     n_generalization=200,
-    noise_fun_kwargs={"delta_small": 0.1, "delta_large": 2.0, "percentage": 0.1},
+    measure_fun_kwargs={"delta_small": 0.1, "delta_large": 2.0, "percentage": 0.1},
 ):
     theta_0_teacher = np.random.normal(loc=0.0, scale=1.0, size=(n_features,))
 
     xs = np.random.normal(loc=0.0, scale=1.0, size=(n_samples, n_features))
-    total_error = noise_fun(n_samples=n_samples, **noise_fun_kwargs)
-
     xs_gen = np.random.normal(loc=0.0, scale=1.0, size=(n_generalization, n_features))
 
-    ys = np.divide(xs @ theta_0_teacher, np.sqrt(n_features)) + total_error
-    ys_gen = np.divide(xs_gen @ theta_0_teacher, np.sqrt(n_features))
+    ys = measure_fun(False, theta_0_teacher, xs, **measure_fun_kwargs)
+    ys_gen = measure_fun(True, theta_0_teacher, xs_gen, **measure_fun_kwargs)
 
     return xs, ys, xs_gen, ys_gen, theta_0_teacher
 
 
 def _find_numerical_mean_std(
     alpha,
-    noise_fun,
+    measure_fun,
     find_coefficients_fun,
     n_features,
     repetitions,
-    noise_fun_kwargs,
+    measure_fun_kwargs,
     reg_param,
     find_coefficients_fun_kwargs,
 ):
@@ -63,11 +93,11 @@ def _find_numerical_mean_std(
 
     for idx in range(repetitions):
         xs, ys, _, _, ground_truth_theta = data_generation(
-            noise_fun,
+            measure_fun,
             n_features=n_features,
             n_samples=max(int(np.around(n_features * alpha)), 1),
             n_generalization=1,
-            noise_fun_kwargs=noise_fun_kwargs,
+            measure_fun_kwargs=measure_fun_kwargs,
         )
 
         estimated_theta = find_coefficients_fun(
@@ -90,7 +120,7 @@ def _find_numerical_mean_std(
 
 
 def generate_different_alpha(
-    noise_fun,
+    measure_fun,
     find_coefficients_fun,
     alpha_1=0.01,
     alpha_2=100,
@@ -98,7 +128,7 @@ def generate_different_alpha(
     n_alpha_points=10,
     repetitions=10,
     reg_param=1.0,
-    noise_fun_kwargs={"delta_small": 0.1, "delta_large": 10.0, "percentage": 0.1},
+    measure_fun_kwargs={"delta_small": 0.1, "delta_large": 10.0, "percentage": 0.1},
     find_coefficients_fun_kwargs={},
 ):
 
@@ -112,11 +142,11 @@ def generate_different_alpha(
     inputs = [
         (
             a,
-            noise_fun,
+            measure_fun,
             find_coefficients_fun,
             n_features,
             repetitions,
-            noise_fun_kwargs,
+            measure_fun_kwargs,
             reg_param,
             find_coefficients_fun_kwargs,
         )

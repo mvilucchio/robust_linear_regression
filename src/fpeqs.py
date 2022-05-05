@@ -1,4 +1,5 @@
 import numpy as np
+from numba import njit
 import src.numerical_functions as numfun
 from multiprocessing import Pool
 # from mpi4py.futures import MPIPoolExecutor as Pool
@@ -76,7 +77,7 @@ def different_alpha_observables_fpeqs(
         for a in alphas
     ]
 
-    with Pool() as pool:
+    with Pool(processes=2) as pool:
         results = pool.starmap(_find_fixed_point, inputs)
 
     for idx, (m, q, sigma) in enumerate(results):
@@ -123,7 +124,7 @@ def different_reg_param_gen_error(
 
 # --------------------------
 
-
+@njit(error_model="numpy", fastmath=True)
 def var_func_BO(
     m_hat, q_hat, sigma_hat, reg_param,
 ):
@@ -131,6 +132,7 @@ def var_func_BO(
     return q, q, 1 - q
 
 
+@njit(error_model="numpy", fastmath=True)
 def var_hat_func_BO_single_noise(m, q, sigma, alpha, delta):
     q_hat = alpha / (1 + delta - q)
     return q_hat, q_hat, q_hat
@@ -142,6 +144,7 @@ def var_hat_func_BO_num_single_noise(m, q, sigma, alpha, delta):
 
 
 def var_hat_func_BO_double_noise(m, q, sigma, alpha, delta_small, delta_large, percentage):
+    raise NotImplementedError
     q_hat = alpha * (1 + (1 - percentage) * delta_large + percentage * delta_small - q) / ((1 + delta_small - q) * (1 + delta_large - q))
     return q_hat, q_hat, q_hat
 
@@ -155,9 +158,23 @@ def var_hat_func_BO_num_double_noise(
     return q_hat, q_hat, q_hat
 
 
+def var_hat_func_BO_decorrelated_noise(m, q, sigma, alpha, delta_small, delta_large, percentage, beta):
+    raise NotImplementedError
+    q_hat = alpha * (1 + (1 - percentage) * delta_large + percentage * delta_small - q) / ((1 + delta_small - q) * (1 + delta_large - q))
+    return q_hat, q_hat, q_hat
+
+
+def var_hat_func_BO_num_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta
+):
+    q_hat = alpha * numfun.q_hat_equation_BO_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta
+    )
+    return q_hat, q_hat, q_hat
+
 # --------------------------
 
-
+@njit(error_model="numpy", fastmath=True)
 def var_func_L2(
     m_hat, q_hat, sigma_hat, reg_param,
 ):
@@ -167,6 +184,7 @@ def var_func_L2(
     return m, q, sigma
 
 
+@njit(error_model="numpy", fastmath=True)
 def var_hat_func_L2_single_noise(m, q, sigma, alpha, delta):
     m_hat = alpha / (1 + sigma)
     q_hat = alpha * (1 + q + delta - 2 * np.abs(m)) / ((1 + sigma) ** 2)
@@ -181,6 +199,7 @@ def var_hat_func_L2_num_single_noise(m, q, sigma, alpha, delta):
     return m_hat, q_hat, sigma_hat
 
 
+@njit(error_model="numpy", fastmath=True)
 def var_hat_func_L2_double_noise(
     m, q, sigma, alpha, delta_small, delta_large, percentage
 ):
@@ -206,6 +225,34 @@ def var_hat_func_L2_num_double_noise(
     return m_hat, q_hat, sigma_hat
 
 
+@njit(error_model="numpy", fastmath=True)
+def var_hat_func_L2_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta
+):
+    delta_eff = (1 - percentage) * delta_small + percentage * delta_large
+    intermediate_val = (1 + percentage * (beta - 1))
+
+    m_hat = alpha * intermediate_val / (1 + sigma)
+    q_hat = alpha * (1 + q + delta_eff + percentage * (beta**2 - 1) - 2 * np.abs(m) * intermediate_val) / ((1 + sigma) ** 2)
+    sigma_hat = alpha / (1 + sigma)
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_L2_num_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta
+):
+    m_hat = alpha * numfun.m_hat_equation_L2_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta
+    )
+    q_hat = alpha * numfun.q_hat_equation_L2_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta
+    )
+    sigma_hat = -alpha * numfun.sigma_hat_equation_L2_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta
+    )
+    return m_hat, q_hat, sigma_hat
+
+
 def var_hat_func_Huber_num_single_noise(m, q, sigma, alpha, delta, a):
     m_hat = alpha * numfun.m_hat_equation_Huber_single_noise(m, q, sigma, delta, a)
     q_hat = alpha * numfun.q_hat_equation_Huber_single_noise(m, q, sigma, delta, a)
@@ -226,5 +273,20 @@ def var_hat_func_Huber_num_double_noise(
     )
     sigma_hat = -alpha * numfun.sigma_hat_equation_Huber_double_noise(
         m, q, sigma, delta_small, delta_large, percentage, a,
+    )
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_Huber_num_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta, a
+):
+    m_hat = alpha * numfun.m_hat_equation_Huber_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta, a,
+    )
+    q_hat = alpha * numfun.q_hat_equation_Huber_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta, a,
+    )
+    sigma_hat = -alpha * numfun.sigma_hat_equation_Huber_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta, a,
     )
     return m_hat, q_hat, sigma_hat

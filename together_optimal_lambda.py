@@ -1,156 +1,181 @@
-import numpy as np
+# from matplotlib import markers
+from matplotlib.lines import Line2D
+from src.utils import load_file
+import src.plotting_utils as pu
 import matplotlib.pyplot as plt
-import fixed_point_equations_double as fpedbl
-from optimal_lambda import optimal_lambda
-import numerics as num
-from tqdm.auto import tqdm
-from src.utils import check_saved, load_file, save_file
+import numpy as np
+from itertools import product
 
-random_number = np.random.randint(0, 100)
+save = False
+random_number = np.random.randint(100)
 
-names_cm = ["Purples", "Blues", "Greens", "Oranges", "Greys"]
+marker_cycler = ['*', 's', "P", "P", "v", "D"]
 
+delta = 1.0
+deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]
+percentages = [0.3] # 0.01, 0.05, 0.1,
 
-def get_cmap(n, name="hsv"):
-    return plt.cm.get_cmap(name, n)
+aa = [0.5, 1.0, 1.5]
 
+all_params = list(product(deltas_large, percentages))
+# all_params = [(5.0, 0.3)] # [(0.5, 0.01), (0.5, 0.05), (1.0, 0.01), (2.0, 0.01)] # (0.5, 0.01), (0.5, 0.05), (0.5, 0.1), (1.0, 0.01), 
+# (0.5, 0.01), (0.5, 0.05), (0.5, 0.1), (0.5, 0.3), (1.0, 0.01), (1.0, 0.05), (1.0, 0.1), (1.0, 0.3), (2.0, 0.01), (2.0, 0.05), (2.0, 0.1), (2.0, 0.3), (5.0, 0.01), (5.0, 0.05), (5.0, 0.1), (5.0, 0.3), (10.0, 0.01), (10.0, 0.05), (10.0, 0.1)
 
-alpha_points_theory = 36
-d = 1500
-reps = 40
+L2_settings = [
+    {
+        "loss_name": "L2",
+        "alpha_min": 0.01,
+        "alpha_max": 100,
+        "alpha_pts": 36,
+        "reg_param" : 1.0,
+        "delta": 0.5,
+        # "delta_small": 0.1,
+        # "delta_large": dl,
+        # "percentage": p,
+        "experiment_type": "theory",
+    }
+]
 
-random_number = np.random.randint(0, 100)
+Huber_settings = [
+    {
+        "loss_name": "Huber",
+        "alpha_min": 0.01,
+        "alpha_max": 100,
+        "alpha_pts": 36,
+        "delta" : 0.5,
+        "reg_param" : 1.0,
+        "a" : a,
+        # "delta_small": 0.1,
+        # "delta_large": dl,
+        # "percentage": p,
+        "experiment_type": "theory",
+    }
+    for a in aa # for dl, p in product(deltas_large, percentages)
+]
 
-alpha_min, alpha_max = 0.01, 100
-eps = [0.05, 0.3]
-loss_chosen = "Huber"
-deltas = [[0.1, 2.0], [0.1, 10.0]]
+BO_settings = [
+    {
+        "alpha_min": 0.01,
+        "alpha_max": 100,
+        "alpha_pts": 36,
+        "delta" : 0.5,
+        # "delta_small": 0.1,
+        # "delta_large": dl,
+        # "percentage": p,
+        "experiment_type": "BO",
+    }
+]
 
-alphas_Hub = [None] * len(deltas) * len(eps)
-errors_Hub = [None] * len(deltas) * len(eps)
-lambdas_Hub = [None] * len(deltas) * len(eps)
+pu.initialization_mpl()
 
-colormap = fpedbl.get_cmap(len(eps) * len(deltas) + 1)
+fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True,)
+fig2, (ax20, ax21) = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(9, 8), gridspec_kw={'height_ratios': [1,1]})
+# fig2, ax21 = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True,)
+# ax22 = ax21.twinx()
 
-# load huber
+cmap = plt.get_cmap("tab10")
+color_lines = []
+error_names = []
 
-# evaluates the lambda optimal for each value
-for idx, e in enumerate(tqdm(eps, desc="epsilon", leave=False)):
-    for jdx, (delta_small, delta_large) in enumerate(
-        tqdm(deltas, desc="delta", leave=False)
-    ):
-        i = idx * len(deltas) + jdx
+reg_param_lines = []
 
-        dat = np.load(
-            f"./data_plot/reg_param optimal/{loss_chosen} double noise - eps {e} - reg_param optimal - alphas [0.01 100 36] - delta [{delta_small} {delta_large}].npz"
-        )
+alphas_L2, errors_L2 = load_file(**L2_settings[0])
+alphas_BO, errors_BO = load_file(**BO_settings[0])
 
-        alphas_Hub[i] = dat["alphas"]
-        errors_Hub[i] = dat["errors"]
-        lambdas_Hub[i] = dat["lambdas"]
+ax.plot(
+    alphas_L2, 
+    errors_L2, 
+    linestyle='dotted',
+    # color=cmap(idx),
+)
 
+ax.plot(
+    alphas_BO, 
+    errors_BO,
+    linestyle='solid',
+    # color=cmap(idx),
+)
 
-alphas_num = [None] * len(deltas) * len(eps)
-lambdas_num = [None] * len(deltas) * len(eps)
-final_errors_mean = [None] * len(deltas) * len(eps)
-final_errors_std = [None] * len(deltas) * len(eps)
+for idx, (Huber_d,) in enumerate(zip(Huber_settings)):
+    alphas_Huber, errors_Huber = load_file(**Huber_d)
 
-for idx, e in enumerate(tqdm(eps, desc="lambda", leave=False)):
-    for jdx, [delta_small, delta_large] in enumerate(
-        tqdm(deltas, desc="delta", leave=False)
-    ):
-        i = idx * len(deltas) + jdx
+    color_lines.append(Line2D([0], [0], color=cmap(idx)))
+    error_names.append("$\Delta_\ell = {:.1f}$".format(all_params[idx][0]))
 
-        alphas_num[i] = alphas_Hub[i][::4].copy()
-        lambdas_num[i] = lambdas_Hub[i][::4].copy()
-        final_errors_mean[i] = np.empty_like(alphas_Hub[i][::4])
-        final_errors_std[i] = np.empty_like(alphas_Hub[i][::4])
+    ax.plot(
+        alphas_Huber,
+        errors_Huber,
+        linestyle='dashed',
+        # color=cmap(idx),
+        label="a = {:.1f}".format(aa[idx])
+    )
 
-        n_alpha_points = len(alphas_num[i])
+   
 
-        final_errors_mean[i] = np.empty((n_alpha_points,))
-        final_errors_std[i] = np.empty((n_alpha_points,))
+    ax20.plot(
+        alphas_L2, 
+        errors_L2 - errors_BO, 
+        linestyle='dotted',
+        marker=marker_cycler[idx],
+        linewidth=1.0,
+        color='b',
+        label="$\Delta_\ell = {:.1f} \:\epsilon = {:.2f}$ (L2)".format(*all_params[idx])
+    )
 
-        for udx, (alpha, reg_param) in enumerate(
-            zip(tqdm(alphas_num[i], desc="alpha", leave=False), lambdas_num[i])
-        ):
-            all_gen_errors = np.empty((reps,))
+    ax20.plot(
+        alphas_L2, 
+        errors_Huber - errors_BO, 
+        linestyle='dotted',
+        marker=marker_cycler[idx],
+        linewidth=1.0,
+        color='b',
+        label="$\Delta_\ell = {:.1f} \:\epsilon = {:.2f}$ (L2)".format(*all_params[idx])
+    )
 
-            for kdx in tqdm(range(reps), desc="reps", leave=False):
-                xs, ys, _, _, ground_truth_theta = num.data_generation_double_noise(
-                    n_features=d,
-                    n_samples=max(int(np.around(d * alpha)), 1),
-                    n_generalization=1,
-                    delta_small=delta_small,
-                    delta_large=delta_large,
-                    eps=e,
-                )
+    ax20.plot(
+        alphas_L2, 
+        errors_Huber - errors_BO, 
+        linestyle='dotted',
+        marker=marker_cycler[idx],
+        linewidth=1.0,
+        color='b',
+        label="$\Delta_\ell = {:.1f} \:\epsilon = {:.2f}$ (L2)".format(*all_params[idx])
+    )
 
-                estimated_theta = num.find_coefficients_Huber(ys, xs, reg_param=reg_param)
+# loss_lines = [
+#     Line2D([0], [0], color='k', linestyle='dotted'),
+#     Line2D([0], [0], color='k', linestyle='dashed'),
+#     Line2D([0], [0], color='k', linestyle='solid')
+# ]
 
-                all_gen_errors[kdx] = np.divide(
-                    np.sum(np.square(ground_truth_theta - estimated_theta)), d
-                )
+# loss_lines_reduced = [
+#     Line2D([0], [0], color='k', linestyle='dotted'),
+#     Line2D([0], [0], color='k', linestyle='dashed'),
+# ]
 
-                del xs
-                del ys
-                del ground_truth_theta
+# first_legend = ax.legend(loss_lines, ["L2", "Huber", "BayesOptimal"])
+# ax.add_artist(first_legend)
+# ax.legend(color_lines, error_names, loc="lower left")
 
-            final_errors_mean[i][udx] = np.mean(all_gen_errors)
-            final_errors_std[i][udx] = np.std(all_gen_errors)
-
-            del all_gen_errors
-
-        np.savez(
-            ".experiments2-Huber-optimal-eps-{}-deltas-{}-deltal-{}".format(
-                e, delta_small, delta_large
-            ),
-            alphas=alphas_num[i],
-            errors_mean=final_errors_mean[i],
-            errors_std=final_errors_std[i],
-            lambdas=lambdas_num[i],
-        )
-
-
-fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
-
-for idx, e in enumerate(eps):
-    colormap = get_cmap(len(deltas) + 3, name=names_cm[idx])
-
-    for jdx, delta in enumerate(deltas):
-        i = idx * len(deltas) + jdx
-        ax.plot(
-            alphas_Hub[i],
-            errors_Hub[i],
-            # marker='.',
-            label=r"$\epsilon = {}$ $\Delta = {}$".format(e, delta),
-            color=colormap(jdx + 3),
-        )
-
-        ax.errorbar(
-            alphas_num[i],
-            final_errors_mean[i],
-            final_errors_std[i],
-            marker=".",
-            linestyle="None",
-            # label=r"$\lambda = {}$ $\Delta = {}$".format(l, delta),
-            color=colormap(jdx + 3),
-        )
-
-ax.set_title(r"{} Loss".format(loss_chosen))
-ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
+ax.set_ylabel(r"Generalization Error: $\frac{1}{d} \mathbb{E}\qty[\norm{\bf{\hat{w}} - \bf{w^\star}}^2]$")
 ax.set_xlabel(r"$\alpha$")
 ax.set_xscale("log")
 ax.set_yscale("log")
-ax.set_xlim([0.009, 110])
-ax.minorticks_on()
-ax.grid(True, which="both")
+# ax.set_xlim([0.009, 110])
 ax.legend()
 
-fig.savefig(
-    "./imgs/zzz{} - together - double noise - {}.png".format(loss_chosen, random_number),
-    format="png",
-    dpi=150,
-)
+fig2.subplots_adjust(wspace=0, hspace=0)
+
+ax20.set_ylabel("Optimal Regularization Parameter", color='b')
+ax21.set_ylabel("Optimal Huber Prameter", color='g')
+ax20.set_xlabel(r"$\alpha$")
+ax20.set_xscale("log")
+# ax21.set_yscale("log")
+# ax21.set_xlim([0.009, 110])
+ax20.legend()
+
+if save:
+    pu.save_plot(fig, "optimal_confronts")
+    pu.save_plot(fig2, "optimal_confronts_params")
 
 plt.show()

@@ -119,16 +119,14 @@ def optimal_huber_parameter(
 
 
 def _find_optimal_reg_param_and_huber_parameter_gen_error(
-    alpha, double_noise, initial, var_hat_kwargs, inital_values
+    alpha, var_hat_func, initial, var_hat_kwargs, inital_values
 ):
     def minimize_fun(x):
         reg_param, a = x
         var_hat_kwargs.update({"a": a})
         m, q, _ = fp.state_equations(
             fp.var_func_L2,
-            fp.var_hat_func_Huber_num_double_noise
-            if double_noise
-            else fp.var_hat_func_Huber_num_single_noise,
+            var_hat_func,
             reg_param=reg_param,
             alpha=alpha,
             init=initial,
@@ -147,7 +145,7 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
 
 
 def optimal_reg_param_and_huber_parameter(
-    double_noise=True,
+    var_hat_func=fp.var_hat_func_Huber_num_double_noise,
     alpha_1=0.01,
     alpha_2=100,
     n_alpha_points=16,
@@ -166,7 +164,7 @@ def optimal_reg_param_and_huber_parameter(
     inital_reg_param = 0.1 * np.random.random() + 0.1
     inital_hub_param = 0.1 * np.random.random() + 0.1
 
-    inputs = [(a, double_noise, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param]) for a in alphas]
+    inputs = [(a, var_hat_func, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param]) for a in alphas]
 
     with Pool() as pool:
         results = pool.starmap(_find_optimal_reg_param_and_huber_parameter_gen_error, inputs)

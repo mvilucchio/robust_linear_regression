@@ -20,7 +20,7 @@ if __name__ == "__main__":
         return plt.cm.get_cmap(name, n)
 
     loss_name = "L2"
-    delta_small, delta_large, percentage = 1.0, 10.0, 0.3
+    delta_small, delta_large, percentage, beta = 0.1, 5.0, 0.3, 0.9
     reg_params = [0.01, 0.1, 1.0, 10.0, 100.0]
 
     experimental_settings = [
@@ -32,7 +32,12 @@ if __name__ == "__main__":
             "reg_param": reg_param,
             "repetitions": 10,
             "n_features": 600,
-            "delta": delta_small,
+            # "delta" : delta_large,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "percentage": percentage,
+            "beta": beta,
+            "a": 1.0,
             "experiment_type": "exp",
         }
         for reg_param in reg_params
@@ -42,10 +47,15 @@ if __name__ == "__main__":
         {
             "loss_name": loss_name,
             "alpha_min": 0.01,
-            "alpha_max": 100,
-            "alpha_pts": 200,
+            "alpha_max": 1000,
+            "alpha_pts": 50,
             "reg_param": reg_param,
-            "delta": delta_small,
+            # "delta" : delta_large,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "percentage": percentage,
+            "beta" : beta,
+            "a": 1.0,
             "experiment_type": "theory",
         }
         for reg_param in reg_params
@@ -63,14 +73,6 @@ if __name__ == "__main__":
     for idx, (exp_dict, theory_dict) in enumerate(
         zip(tqdm(experimental_settings, desc="reg_param", leave=False), theory_settings)
     ):
-        file_exists, file_path = check_saved(**exp_dict)
-
-        if not file_exists:
-            experiment_runner(**exp_dict)
-
-        exp_dict.update({"file_path": file_path})
-        alphas_num[idx], errors_mean_num[idx], errors_std_num[idx] = load_file(**exp_dict)
-
         file_exists, file_path = check_saved(**theory_dict)
 
         if not file_exists:
@@ -79,11 +81,19 @@ if __name__ == "__main__":
         theory_dict.update({"file_path": file_path})
         alphas_theory[idx], errors_theory[idx] = load_file(**theory_dict)
 
+        file_exists, file_path = check_saved(**exp_dict)
+
+        if not file_exists:
+            experiment_runner(**exp_dict)
+
+        exp_dict.update({"file_path": file_path})
+        alphas_num[idx], errors_mean_num[idx], errors_std_num[idx] = load_file(**exp_dict)
+
     # ------------
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
-    pu.initialization_mpl()
+    # pu.initialization_mpl()
 
     for idx, (al_n, err_m, err_s, al_t, err_t) in enumerate(
         zip(alphas_num, errors_mean_num, errors_std_num, alphas_theory, errors_theory)
@@ -92,6 +102,7 @@ if __name__ == "__main__":
         ax.plot(
             al_t,
             err_t,
+            linewidth=1,
             # marker='.',
             label=r"$\lambda = {}$".format(reg_params[idx]),
             color=colormap(idx + 3),
@@ -110,7 +121,8 @@ if __name__ == "__main__":
     ax.set_xlabel(r"$\alpha$")
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlim([0.009, 110])
+    # ax.set_xlim([0.009, 110])
+    ax.grid()
     ax.legend()
 
     if save:

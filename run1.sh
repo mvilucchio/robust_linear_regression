@@ -3,7 +3,7 @@
 #SBATCH --nodes 1
 #SBATCH --tasks-per-node 36
 #SBATCH --mem 120G
-#SBATCH --time 00:20:00
+#SBATCH --time 20:00:00
 #SBATCH -o output.out
 #SBATCH -e error.out
 #SBATCH --partition=parallel

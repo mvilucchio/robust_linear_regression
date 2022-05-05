@@ -1,4 +1,4 @@
-lines.linewidth: 2.0
+lines.linewidth: 3.0
 
 font.size: 18
 font.family: 'xyzxyz'
@@ -10,6 +10,7 @@ text.latex.preamble: \usepackage{amsfonts}\usepackage{physics}
 
 legend.edgecolor: 'w'
 legend.handlelength: 1.4
+legend.fontsize: 16
 
 
 axes.grid: True
