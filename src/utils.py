@@ -9,7 +9,7 @@ from src.optimal_lambda import (
 )
 
 
-DATA_FOLDER_PATH = "./data" # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  # 
+DATA_FOLDER_PATH = "./data"  # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  #
 
 FOLDER_PATHS = [
     "./data/experiments",
@@ -23,16 +23,18 @@ FOLDER_PATHS = [
 ]
 
 REG_EXPS = [
-    "(exp)",
-    "(theory)",
+    "(^exp)",
+    "(^theory)",
     "(BO|Bayes[ ]{0,1}Optimal)",
-    "((reg[\_\s]{0,1}param|lambda)[\_\s]{0,1}optimal)",
-    "((reg[\_\s]{0,1}param|lambda)[\_\s]{0,1}optimal)[\_\s]{1}exp",
-    "((reg[\_\s]{0,1}param|lambda)[\s]{1}(huber[\_\s]{0,1}param)[\_\s]{0,1}optimal)",
-    "((reg[\_\s]{0,1}param|lambda)[\s]{1}(huber[\_\s]{0,1}param)[\_\s]{0,1}optimal)[\_\s]{1}exp",
+    "((reg[\_\s]{0,1}param|lambda)[\_\s]{0,1}optimal$)",
+    "((reg[\_\s]{0,1}param|lambda)[\_\s]{0,1}(optimal)[\_\s]{1}(exp))",
+    "((reg[\_\s]{0,1}param|lambda)[\s]{1}(huber[\_\s]{0,1}param)[\_\s]{0,1}optimal$)",
+    "((reg[\_\s]{0,1}param|lambda)[\s]{1}(huber[\_\s]{0,1}param)[\_\s]{0,1}optimal)[\_\s]{1}(exp)",
 ]
 
 LOSS_NAMES = ["L2", "L1", "Huber"]
+
+EXPERIMENTAL_FUNCTIONS = []
 
 SINGLE_NOISE_NAMES = [
     "{loss_name} single noise - exp - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - dim {n_features:d} - rep {repetitions:d} - delta {delta} - lambda {reg_param}",
@@ -112,7 +114,7 @@ def create_check_folders():
 
 
 def check_saved(**kwargs):
-    # create_check_folders()
+    create_check_folders()
 
     experiment_code = _exp_type_choser(kwargs["experiment_type"])
     folder_path = FOLDER_PATHS[experiment_code]
@@ -259,11 +261,11 @@ def experimental_points_runner(**kwargs):
 
     if decorrelated_noise:
         measure_fun_kwargs = {
-                "delta_small": kwargs["delta_small"],
-                "delta_large": kwargs["delta_large"],
-                "percentage": kwargs["percentage"],
-                "beta" : kwargs["beta"]
-            }
+            "delta_small": kwargs["delta_small"],
+            "delta_large": kwargs["delta_large"],
+            "percentage": kwargs["percentage"],
+            "beta": kwargs["beta"],
+        }
         error_function = num.measure_gen_decorrelated
     else:
         if double_noise:
@@ -326,7 +328,7 @@ def theory_curve_runner(**kwargs):
             "delta_small": kwargs["delta_small"],
             "delta_large": kwargs["delta_large"],
             "percentage": kwargs["percentage"],
-            "beta": kwargs["beta"]
+            "beta": kwargs["beta"],
         }
 
         delta_small = kwargs["delta_small"]
@@ -361,7 +363,10 @@ def theory_curve_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
                     initial_condition = [m, q, sigma]
                     break
 
@@ -385,11 +390,11 @@ def theory_curve_runner(**kwargs):
                     break
 
             var_functions = [
-            fpe.var_hat_func_L2_single_noise,
-            -1,
-            fpe.var_hat_func_Huber_num_single_noise,
-            -1,
-        ]
+                fpe.var_hat_func_L2_single_noise,
+                -1,
+                fpe.var_hat_func_Huber_num_single_noise,
+                -1,
+            ]
 
     if _loss_type_chose(kwargs["loss_name"], values=[False, False, True, False]):
         var_hat_kwargs.update({"a": kwargs["a"]})
@@ -423,7 +428,7 @@ def bayes_optimal_runner(**kwargs):
             "delta_small": kwargs["delta_small"],
             "delta_large": kwargs["delta_large"],
             "percentage": kwargs["percentage"],
-            "beta": kwargs["beta"]
+            "beta": kwargs["beta"],
         }
 
         delta_small = kwargs["delta_small"]
@@ -453,7 +458,10 @@ def bayes_optimal_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
                     initial_condition = [m, q, sigma]
                     break
 
@@ -501,7 +509,7 @@ def reg_param_optimal_runner(**kwargs):
             "delta_small": kwargs["delta_small"],
             "delta_large": kwargs["delta_large"],
             "percentage": kwargs["percentage"],
-            "beta": kwargs["beta"]
+            "beta": kwargs["beta"],
         }
 
         delta_small = kwargs["delta_small"]
@@ -536,7 +544,10 @@ def reg_param_optimal_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
                     initial_condition = [m, q, sigma]
                     break
 
@@ -586,7 +597,98 @@ def reg_param_optimal_runner(**kwargs):
 
 
 def reg_param_optimal_experiment_runner(**kwargs):
-    raise NotImplementedError
+    n_pts_theoretical = kwargs["alpha_pts_theoretical"]
+    n_pts_experimental = kwargs["alpha_pts_experimental"]
+
+    theoretical_exp_dict = kwargs.copy()
+    theoretical_exp_dict.update(
+        {"experiment_type": "reg_param optimal", "alpha_pts": n_pts_theoretical,}
+    )
+    file_exists, file_path = check_saved(**theoretical_exp_dict)
+
+    if not file_exists:
+        raise RuntimeError("The file corresponding to the experiment do not exists")
+
+    theoretical_exp_dict.update(
+        {"file_path": file_path,}
+    )
+    alphas_theoretical, _, lambdas_theoretical = load_file(**theoretical_exp_dict)
+
+    alphas_experimental = np.append(
+        alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
+        alphas_theoretical[-1],
+    )
+    lambdas_experimental = np.append(
+        lambdas_theoretical[:: n_pts_theoretical // n_pts_experimental],
+        lambdas_theoretical[-1],
+    )
+
+    double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
+    decorrelated_noise = not (kwargs.get("beta", 1.0) == 1.0)
+
+    if decorrelated_noise:
+        measure_fun_kwargs = {
+            "delta_small": kwargs["delta_small"],
+            "delta_large": kwargs["delta_large"],
+            "percentage": kwargs["percentage"],
+            "beta": kwargs["beta"],
+        }
+        error_function = num.measure_gen_decorrelated
+    else:
+        if double_noise:
+            error_function = num.measure_gen_double
+            measure_fun_kwargs = {
+                "delta_small": kwargs["delta_small"],
+                "delta_large": kwargs["delta_large"],
+                "percentage": kwargs["percentage"],
+            }
+        else:
+            error_function = num.measure_gen_single
+            measure_fun_kwargs = {"delta": kwargs["delta"]}
+
+    if kwargs["loss_name"] == "Huber":
+        find_coefficients_fun_kwargs = {"a": kwargs["a"]}
+    else:
+        find_coefficients_fun_kwargs = {}
+
+    _, errors_mean, errors_std = num.generate_different_alpha(
+        error_function,
+        _loss_type_chose(
+            kwargs["loss_name"],
+            values=[
+                num.find_coefficients_L2,
+                -1,  # num.find_coefficients_L1,
+                num.find_coefficients_Huber,
+                -1,
+            ],
+        ),
+        alpha_1=kwargs["alpha_min"],
+        alpha_2=kwargs["alpha_max"],
+        n_features=kwargs["n_features"],
+        repetitions=kwargs["repetitions"],
+        reg_param=lambdas_experimental,
+        measure_fun_kwargs=measure_fun_kwargs,
+        find_coefficients_fun_kwargs=find_coefficients_fun_kwargs,
+        alphas=alphas_experimental,
+    )
+
+    kwargs.update(
+        {"alpha_pts": n_pts_experimental,}
+    )
+
+    _, file_path = check_saved(**kwargs)
+
+    kwargs.update(
+        {
+            "file_path": file_path,
+            "alphas": alphas_experimental,
+            "errors_mean": errors_mean,
+            "errors_std": errors_std,
+            "lambdas": lambdas_experimental,
+        }
+    )
+
+    save_file(**kwargs)
 
 
 def reg_param_and_huber_param_optimal_runner(**kwargs):
@@ -600,7 +702,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
             "delta_small": kwargs["delta_small"],
             "delta_large": kwargs["delta_large"],
             "percentage": kwargs["percentage"],
-            "beta": kwargs["beta"]
+            "beta": kwargs["beta"],
         }
 
         delta_small = kwargs["delta_small"]
@@ -630,7 +732,10 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
+                if (
+                    np.square(m) < q + delta_small * q
+                    and np.square(m) < q + delta_large * q
+                ):
                     initial_condition = [m, q, sigma]
                     break
 
@@ -646,7 +751,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                 if np.square(m) < q + delta * q:
                     initial_condition = [m, q, sigma]
                     break
-            
+
             var_hat_func = fpe.var_hat_func_Huber_num_single_noise
 
     alphas, errors, lambdas, huber_params = optimal_reg_param_and_huber_parameter(
@@ -672,4 +777,96 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
 
 
 def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
-    raise NotImplementedError
+    n_pts_theoretical = kwargs["alpha_pts_theoretical"]
+    n_pts_experimental = kwargs["alpha_pts_experimental"]
+
+    theoretical_exp_dict = kwargs.copy()
+    theoretical_exp_dict.update(
+        {
+            "experiment_type": "reg_param huber_param optimal",
+            "alpha_pts": n_pts_theoretical,
+        }
+    )
+    file_exists, file_path = check_saved(**theoretical_exp_dict)
+
+    if not file_exists:
+        raise RuntimeError("The file corresponding to the experiment do not exists")
+
+    theoretical_exp_dict.update(
+        {"file_path": file_path,}
+    )
+
+    alphas_theoretical, _, lambdas_theoretical, huber_params_theoretical = load_file(
+        theoretical_exp_dict
+    )
+
+    alphas_experimental = np.append(
+        alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
+        alphas_theoretical[-1],
+    )
+    lambdas_experimental = np.append(
+        lambdas_theoretical[:: n_pts_theoretical // n_pts_experimental],
+        lambdas_theoretical[-1],
+    )
+    huber_params_experimental = np.append(
+        huber_params_theoretical[:: n_pts_theoretical // n_pts_experimental],
+        huber_params_theoretical[-1],
+    )
+
+    double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
+    decorrelated_noise = not (kwargs.get("beta", 1.0) == 1.0)
+
+    if decorrelated_noise:
+        measure_fun_kwargs = {
+            "delta_small": kwargs["delta_small"],
+            "delta_large": kwargs["delta_large"],
+            "percentage": kwargs["percentage"],
+            "beta": kwargs["beta"],
+        }
+        error_function = num.measure_gen_decorrelated
+    else:
+        if double_noise:
+            error_function = num.measure_gen_double
+            measure_fun_kwargs = {
+                "delta_small": kwargs["delta_small"],
+                "delta_large": kwargs["delta_large"],
+                "percentage": kwargs["percentage"],
+            }
+        else:
+            error_function = num.measure_gen_single
+            measure_fun_kwargs = {"delta": kwargs["delta"]}
+
+    find_coefficients_fun_kwargs = [{"a": a} for a in huber_params_experimental]
+
+    _, errors_mean, errors_std = num.generate_different_alpha(
+        error_function,
+        num.find_coefficients_Huber,
+        alpha_1=kwargs["alpha_min"],
+        alpha_2=kwargs["alpha_max"],
+        n_features=kwargs["n_features"],
+        n_alpha_points=kwargs["alpha_pts"],
+        repetitions=kwargs["repetitions"],
+        reg_param=lambdas_experimental,
+        measure_fun_kwargs=measure_fun_kwargs,
+        find_coefficients_fun_kwargs=find_coefficients_fun_kwargs,
+        alphas=alphas_experimental,
+    )
+
+    kwargs.update(
+        {"alpha_pts": n_pts_experimental,}
+    )
+
+    _, file_path = check_saved(**kwargs)
+
+    kwargs.update(
+        {
+            "file_path": file_path,
+            "alphas": alphas_experimental,
+            "errors_mean": errors_mean,
+            "errors_std": errors_std,
+            "lambdas": lambdas_experimental,
+            "huber_params": huber_params_experimental,
+        }
+    )
+
+    save_file(**kwargs)

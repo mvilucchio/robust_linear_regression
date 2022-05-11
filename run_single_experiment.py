@@ -9,23 +9,24 @@ if __name__ == "__main__":
     else:
         percentage, delta_small, delta_large = map(float, sys.argv[1:])
 
-    aa = [0.5, 1.0, 1.5]
+    aa = [1.0]
 
     experiments_settings = [
         {
             "loss_name": "L2",
             "alpha_min": 0.01,
             "alpha_max": 100,
-            "alpha_pts": 36,
-            "reg_param": 1.0,
-            "delta" : 0.5,
-            "a" : a,
-            # "delta_small": delta_small,
-            # "delta_large": delta_large,
-            # "percentage": percentage,
-            # "a": 1.0,
+            # "alpha_pts": 36,
+            "alpha_pts_theoretical": 36,
+            "alpha_pts_experimental": 4,
+            "delta": 0.5,
+            "delta_small": delta_small,
+            "delta_large": delta_large,
+            "percentage": percentage,
+            "n_features": 500,
+            "repetitions": 4,
             # "beta": 0.0,
-            "experiment_type": "BO",
+            "experiment_type": "reg_param optimal exp",
         }
         for a in aa
     ]

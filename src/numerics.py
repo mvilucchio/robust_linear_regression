@@ -1,9 +1,11 @@
 import numpy as np
 from scipy import optimize
+from numbers import Number
 from sklearn.utils import axis0_safe_slice
 from sklearn.utils.extmath import safe_sparse_dot
 import numba as nb
 from multiprocessing import Pool
+
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
 # import cvxpy as cp
@@ -22,13 +24,17 @@ def measure_gen_single(generalization, teacher_vector, xs, delta=1):
     return ys
 
 
-def measure_gen_double(generalization, teacher_vector, xs, delta_small=1, delta_large=10, percentage=0.1):
+def measure_gen_double(
+    generalization, teacher_vector, xs, delta_small=1, delta_large=10, percentage=0.1
+):
     n_samples, n_features = xs.shape
     w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
     if generalization:
         ys = w_xs
     else:
-        choice = np.random.choice([0, 1], p=[1 - percentage, percentage], size=(n_samples,))
+        choice = np.random.choice(
+            [0, 1], p=[1 - percentage, percentage], size=(n_samples,)
+        )
         error_sample = np.empty((n_samples, 2))
         error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(
             loc=0.0, scale=1.0, size=(n_samples,)
@@ -41,13 +47,23 @@ def measure_gen_double(generalization, teacher_vector, xs, delta_small=1, delta_
     return ys
 
 
-def measure_gen_decorrelated(generalization, teacher_vector, xs, delta_small=1, delta_large=10, percentage=0.1, beta=0.0):
+def measure_gen_decorrelated(
+    generalization,
+    teacher_vector,
+    xs,
+    delta_small=1,
+    delta_large=10,
+    percentage=0.1,
+    beta=0.0,
+):
     n_samples, n_features = xs.shape
     w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
     if generalization:
         ys = w_xs
     else:
-        choice = np.random.choice([0, 1], p=[1 - percentage, percentage], size=(n_samples,))
+        choice = np.random.choice(
+            [0, 1], p=[1 - percentage, percentage], size=(n_samples,)
+        )
         error_sample = np.empty((n_samples, 2))
         error_sample[:, 0] = np.sqrt(delta_small) * np.random.normal(
             loc=0.0, scale=1.0, size=(n_samples,)
@@ -130,11 +146,18 @@ def generate_different_alpha(
     reg_param=1.0,
     measure_fun_kwargs={"delta_small": 0.1, "delta_large": 10.0, "percentage": 0.1},
     find_coefficients_fun_kwargs={},
+    alphas=None,
 ):
+    if alphas is None:
+        alphas = np.logspace(
+            np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
+        )
 
-    alphas = np.logspace(
-        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
-    )
+    if isinstance(reg_param, Number):
+        reg_param = reg_param * np.ones_like(alphas)
+
+    if not isinstance(find_coefficients_fun_kwargs, list):
+        find_coefficients_fun_kwargs = [find_coefficients_fun_kwargs] * len(alphas)
 
     errors_mean = np.empty((n_alpha_points,))
     errors_std = np.empty((n_alpha_points,))
@@ -147,10 +170,10 @@ def generate_different_alpha(
             n_features,
             repetitions,
             measure_fun_kwargs,
-            reg_param,
-            find_coefficients_fun_kwargs,
+            rp,
+            fckw,
         )
-        for a in alphas
+        for a, rp, fckw in zip(alphas, reg_param, find_coefficients_fun_kwargs)
     ]
 
     with Pool() as pool:
