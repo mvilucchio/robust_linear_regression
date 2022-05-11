@@ -20,7 +20,7 @@ if __name__ == "__main__":
         return plt.cm.get_cmap(name, n)
 
     loss_name = "L2"
-    delta_small, delta_large, percentage, beta = 0.1, 5.0, 0.3, 0.9
+    delta_small, delta_large, percentage, beta = 0.1, 5.0, 0.1, 0.0
     reg_params = [0.01, 0.1, 1.0, 10.0, 100.0]
 
     experimental_settings = [
@@ -47,8 +47,8 @@ if __name__ == "__main__":
         {
             "loss_name": loss_name,
             "alpha_min": 0.01,
-            "alpha_max": 1000,
-            "alpha_pts": 50,
+            "alpha_max": 100,
+            "alpha_pts": 100,
             "reg_param": reg_param,
             # "delta" : delta_large,
             "delta_small": delta_small,
@@ -81,13 +81,13 @@ if __name__ == "__main__":
         theory_dict.update({"file_path": file_path})
         alphas_theory[idx], errors_theory[idx] = load_file(**theory_dict)
 
-        file_exists, file_path = check_saved(**exp_dict)
+        # file_exists, file_path = check_saved(**exp_dict)
 
-        if not file_exists:
-            experiment_runner(**exp_dict)
+        # if not file_exists:
+        #     experiment_runner(**exp_dict)
 
-        exp_dict.update({"file_path": file_path})
-        alphas_num[idx], errors_mean_num[idx], errors_std_num[idx] = load_file(**exp_dict)
+        # exp_dict.update({"file_path": file_path})
+        # alphas_num[idx], errors_mean_num[idx], errors_std_num[idx] = load_file(**exp_dict)
 
     # ------------
 
@@ -105,12 +105,12 @@ if __name__ == "__main__":
             linewidth=1,
             # marker='.',
             label=r"$\lambda = {}$".format(reg_params[idx]),
-            color=colormap(idx + 3),
+            # color=colormap(idx + 3),
         )
 
-        ax.errorbar(
-            al_n, err_m, err_s, marker=".", linestyle="None", color=colormap(idx + 3),
-        )
+        # ax.errorbar(
+        #     al_n, err_m, err_s, marker=".", linestyle="None", color=colormap(idx + 3),
+        # )
 
     ax.set_title(
         r"{} Loss - $\Delta = [{:.2f}, {:.2f}], \epsilon = {:.2f}$".format(
