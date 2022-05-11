@@ -9,7 +9,7 @@ from src.optimal_lambda import (
 )
 
 
-DATA_FOLDER_PATH = "/Volumes/LaCie/final_data_hproblem" # "./data" # "/Volumes/LaCie/final_data_hproblem" #  #  # 
+DATA_FOLDER_PATH = "./data" # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  # 
 
 FOLDER_PATHS = [
     "./data/experiments",
