@@ -350,14 +350,14 @@ def theory_curve_runner(**kwargs):
         ]
     else:
         if double_noise:
-            var_hat_kwargs = {
-                "delta_small": kwargs["delta_small"],
-                "delta_large": kwargs["delta_large"],
-                "percentage": kwargs["percentage"],
-            }
-
             delta_small = kwargs["delta_small"]
             delta_large = kwargs["delta_large"]
+
+            var_hat_kwargs = {
+                "delta_small": delta_small,
+                "delta_large": delta_large,
+                "percentage": kwargs["percentage"],
+            }
 
             while True:
                 m = 0.89 * np.random.random() + 0.1

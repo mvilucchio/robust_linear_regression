@@ -1,16 +1,74 @@
 import numpy as np
 from scipy.integrate import dblquad
+from scipy.optimize import root_scalar
 from numba import njit, vectorize
+from src.loss_functions import proximal_loss_double_quad
 from src.integration_utils import (
     find_integration_borders_square,
     divide_integration_borders_grid,
     domains_double_line_constraint,
     domains_double_line_constraint_only_inside,
+    double_romb_integration,
+    precompute_values_double_romb_integration,
+    romberg_linspace,
 )
 
 MULT_INTEGRAL = 10
 EPSABS = 1e-9
 EPSREL = 1e-9
+
+
+@njit(error_model="numpy", fastmath=True)
+def _gaussian_function(y, x):
+    return np.exp(-(x ** 2) / 2) / np.sqrt(2 * np.pi)
+
+
+def precompute_proximals_loss_double_quad_grid(
+    x_range, y_range, m, q, sigma, width,
+):
+    # create the array if it is not there
+    #  print("width ", type(width))
+    shape = (len(x_range), len(y_range))
+    proximals = np.empty(shape)
+    proximal_derivatives = np.empty(shape)
+
+    # print("m : {} q : {} sigma : {}".format(m, q, sigma))
+
+    with np.nditer(
+        [proximals, proximal_derivatives], flags=["multi_index"], op_flags=["readwrite"]
+    ) as it:
+        for prox, prox_der in it:
+            # print(
+            #     "y {:.7f} q {:.7f} sigma {:.7f} width {:.1f}".format(
+            #         y_range[it.multi_index[0]],
+            #         np.sqrt(q) * x_range[it.multi_index[1]],
+            #         sigma,
+            #         width,
+            #     ),
+            #     end="",
+            # )
+            prox[...], prox_der[...] = proximal_loss_double_quad(
+                y_range[it.multi_index[0]],
+                np.sqrt(q) * x_range[it.multi_index[1]],
+                sigma,
+                width,
+            )
+            # print("", end="\r")
+
+    #  print("------- prox {} Dprox {}".format(proximals.shape, proximal_derivatives.shape))
+
+    return proximals, proximal_derivatives
+
+
+# ------------------------------
+
+
+@njit(error_model="numpy", fastmath=True)
+def _ZoutBayes_single_noise_erm(y, xi, m, q, sigma, delta):
+    eta = m ** 2 / q
+    return np.exp(-((y - np.sqrt(eta) * xi) ** 2) / (2 * (1 - eta + delta))) / np.sqrt(
+        2 * np.pi * (1 - eta + delta)
+    )
 
 
 @njit(error_model="numpy", fastmath=True)
@@ -21,8 +79,29 @@ def ZoutBayes_single_noise(y, omega, V, delta):
 
 
 @njit(error_model="numpy", fastmath=True)
+def _foutBayes_single_noise_erm(y, xi, m, q, sigma, delta):
+    eta = m ** 2 / q
+    return (y - np.sqrt(eta) * xi) / (1 - eta + delta)
+
+
+@njit(error_model="numpy", fastmath=True)
 def foutBayes_single_noise(y, omega, V, delta):
     return (y - omega) / (V + delta)
+
+
+# ----
+
+
+@njit(error_model="numpy", fastmath=True)
+def _ZoutBayes_double_noise_erm(y, xi, m, q, sigma, delta_small, delta_large, eps):
+    eta = m ** 2 / q
+    return (1 - eps) * np.exp(
+        -((y - np.sqrt(eta) * xi) ** 2) / (2 * (1 - eta + delta_small))
+    ) / np.sqrt(2 * np.pi * (1 - eta + delta_small)) + eps * np.exp(
+        -((y - np.sqrt(eta) * xi) ** 2) / (2 * (1 - eta + delta_large))
+    ) / np.sqrt(
+        2 * np.pi * (1 - eta + delta_large)
+    )
 
 
 @njit(error_model="numpy", fastmath=True)
@@ -31,6 +110,28 @@ def ZoutBayes_double_noise(y, omega, V, delta_small, delta_large, eps):
         2 * np.pi * (V + delta_small)
     ) + eps * np.exp(-((y - omega) ** 2) / (2 * (V + delta_large))) / np.sqrt(
         2 * np.pi * (V + delta_large)
+    )
+
+
+@njit(error_model="numpy", fastmath=True)
+def _foutBayes_double_noise_erm(y, xi, m, q, sigma, delta_small, delta_large, eps):
+    eta = m ** 2 / q
+    small_exponential = np.exp(
+        -((y - np.sqrt(eta) * xi) ** 2) / (2 * (1 - eta + delta_small))
+    )
+    large_exponential = np.exp(
+        -((y - np.sqrt(eta) * xi) ** 2) / (2 * (1 - eta + delta_large))
+    )
+    return (
+        (y - np.sqrt(eta) * xi)
+        * (
+            (1 - eps) * small_exponential / np.power(1 - eta + delta_small, 3 / 2)
+            + eps * large_exponential / np.power(1 - eta + delta_large, 3 / 2)
+        )
+        / (
+            (1 - eps) * small_exponential / np.power(1 - eta + delta_small, 1 / 2)
+            + eps * large_exponential / np.power(1 - eta + delta_large, 1 / 2)
+        )
     )
 
 
@@ -50,27 +151,80 @@ def foutBayes_double_noise(y, omega, V, delta_small, delta_large, eps):
         )
     )
 
+
+# ----
+
+
+@njit(error_model="numpy", fastmath=True)
+def _ZoutBayes_decorrelated_noise_erm(
+    y, xi, m, q, sigma, delta_small, delta_large, eps, beta
+):
+    eta = m ** 2 / q
+    return (1 - eps) * np.exp(
+        -((y - np.sqrt(eta) * xi) ** 2) / (2 * (1 - eta + delta_small))
+    ) / np.sqrt(2 * np.pi * (1 - eta + delta_small)) + eps * np.exp(
+        -((y - beta * np.sqrt(eta) * xi) ** 2)
+        / (2 * (beta ** 2 * (1 - eta) + delta_large))
+    ) / np.sqrt(
+        2 * np.pi * (beta ** 2 * (1 - eta) + delta_large)
+    )
+
+
 @njit(error_model="numpy", fastmath=True)
 def ZoutBayes_decorrelated_noise(y, omega, V, delta_small, delta_large, eps, beta):
-    return (1 - eps) * np.exp( -((y - omega) ** 2) / (2 * (V + delta_small)) ) / np.sqrt(
+    return (1 - eps) * np.exp(-((y - omega) ** 2) / (2 * (V + delta_small))) / np.sqrt(
         2 * np.pi * (V + delta_small)
-    ) + eps * np.exp(-((y - beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))) / np.sqrt(
+    ) + eps * np.exp(
+        -((y - beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
+    ) / np.sqrt(
         2 * np.pi * (beta ** 2 * V + delta_large)
     )
+
+
+@njit(error_model="numpy", fastmath=True)
+def _foutBayes_decorrelated_noise_erm(
+    y, xi, m, q, sigma, delta_small, delta_large, eps, beta
+):
+    eta = m ** 2 / q
+    small_exponential = np.exp(
+        -((y - np.sqrt(eta) * xi) ** 2) / (2 * (1 - eta + delta_small))
+    )
+    large_exponential = np.exp(
+        -((y - beta * np.sqrt(eta) * xi) ** 2)
+        / (2 * (beta ** 2 * (1 - eta) + delta_large))
+    )
+    return (
+        (y - np.sqrt(eta) * xi)
+        * (1 - eps)
+        * small_exponential
+        / np.power(1 - eta + delta_small, 3 / 2)
+        + eps
+        * beta
+        * (y - beta * np.sqrt(eta) * xi)
+        * large_exponential
+        / np.power(beta ** 2 * (1 - eta) + delta_large, 3 / 2)
+    ) / (
+        (1 - eps) * small_exponential / np.power(1 - eta + delta_small, 1 / 2)
+        + eps * large_exponential / np.power(beta ** 2 * (1 - eta) + delta_large, 1 / 2)
+    )
+
 
 @njit(error_model="numpy", fastmath=True)
 def foutBayes_decorrelated_noise(y, omega, V, delta_small, delta_large, eps, beta):
     small_exponential = np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
-    large_exponential = np.exp(-((y - beta * omega) ** 2) / (2 * (beta**2 * V + delta_large)))
+    large_exponential = np.exp(
+        -((y - beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
+    )
     return (
-        (
-            (y - omega) * (1 - eps) * small_exponential / np.power(V + delta_small, 3 / 2)
-            + eps * beta * (y - beta * omega) * large_exponential / np.power(beta ** 2 * V + delta_large, 3 / 2)
-        )
-        / (
-            (1 - eps) * small_exponential / np.power(V + delta_small, 1 / 2)
-            + eps * large_exponential / np.power(beta ** 2 * V + delta_large, 1 / 2)
-        )
+        (y - omega) * (1 - eps) * small_exponential / np.power(V + delta_small, 3 / 2)
+        + eps
+        * beta
+        * (y - beta * omega)
+        * large_exponential
+        / np.power(beta ** 2 * V + delta_large, 3 / 2)
+    ) / (
+        (1 - eps) * small_exponential / np.power(V + delta_small, 1 / 2)
+        + eps * large_exponential / np.power(beta ** 2 * V + delta_large, 1 / 2)
     )
 
 
@@ -360,12 +514,67 @@ def sigma_integral_Huber_double_noise(
         * DfoutHuber(y, np.sqrt(q) * xi, sigma, a)
     )
 
+
+# ----
+
+
+@njit(error_model="numpy", fastmath=True)
+def m_integral_numerical_loss_double_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, a
+):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes_double_noise(
+            y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps
+        )
+        * foutBayes_double_noise(
+            y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps
+        )
+        * foutHuber(y, np.sqrt(q) * xi, sigma, a)
+    )
+
+
+@njit(error_model="numpy", fastmath=True)
+def q_integral_numerical_loss_double_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, a
+):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes_double_noise(
+            y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps
+        )
+        * (foutHuber(y, np.sqrt(q) * xi, sigma, a) ** 2)
+    )
+
+
+@njit(error_model="numpy", fastmath=True)
+def sigma_integral_numerical_loss_double_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, a
+):
+    eta = m ** 2 / q
+    return (
+        np.exp(-(xi ** 2) / 2)
+        / np.sqrt(2 * np.pi)
+        * ZoutBayes_double_noise(
+            y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps
+        )
+        * DfoutHuber(y, np.sqrt(q) * xi, sigma, a)
+    )
+
+
 # --------------
 # Functions to integrate - Decorrelated Noise
 # --------------
 
+
 @njit(error_model="numpy", fastmath=True)
-def q_integral_BO_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_large, eps, beta):
+def q_integral_BO_decorrelated_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, beta
+):
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
@@ -385,7 +594,9 @@ def q_integral_BO_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_larg
 
 
 @njit(error_model="numpy", fastmath=True)
-def m_integral_L2_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_large, eps, beta):
+def m_integral_L2_decorrelated_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, beta
+):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
@@ -401,7 +612,9 @@ def m_integral_L2_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_larg
 
 
 @njit(error_model="numpy", fastmath=True)
-def q_integral_L2_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_large, eps, beta):
+def q_integral_L2_decorrelated_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, beta
+):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
@@ -414,7 +627,9 @@ def q_integral_L2_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_larg
 
 
 @njit(error_model="numpy", fastmath=True)
-def sigma_integral_L2_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_large, eps, beta):
+def sigma_integral_L2_decorrelated_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, beta
+):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
@@ -430,7 +645,9 @@ def sigma_integral_L2_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_
 
 
 @njit(error_model="numpy", fastmath=True)
-def m_integral_Huber_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_large, eps, beta, a):
+def m_integral_Huber_decorrelated_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, beta, a
+):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
@@ -446,7 +663,9 @@ def m_integral_Huber_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_l
 
 
 @njit(error_model="numpy", fastmath=True)
-def q_integral_Huber_decorrelated_noise(y, xi, q, m, sigma, delta_small, delta_large, eps, beta, a):
+def q_integral_Huber_decorrelated_noise(
+    y, xi, q, m, sigma, delta_small, delta_large, eps, beta, a
+):
     eta = m ** 2 / q
     return (
         np.exp(-(xi ** 2) / 2)
@@ -527,7 +746,7 @@ def q_hat_equation_BO_single_noise(m, q, sigma, delta):
         borders[1][1],
         args=(q, m, sigma, delta),
         epsabs=EPSABS,
-        epsrel=EPSREL
+        epsrel=EPSREL,
     )[0]
 
 
@@ -550,7 +769,7 @@ def m_hat_equation_L2_single_noise(m, q, sigma, delta):
         borders[1][1],
         args=(q, m, sigma, delta),
         epsabs=EPSABS,
-        epsrel=EPSREL
+        epsrel=EPSREL,
     )[0]
 
 
@@ -568,7 +787,7 @@ def q_hat_equation_L2_single_noise(m, q, sigma, delta):
         borders[1][1],
         args=(q, m, sigma, delta),
         epsabs=EPSABS,
-        epsrel=EPSREL
+        epsrel=EPSREL,
     )[0]
 
 
@@ -586,13 +805,14 @@ def sigma_hat_equation_L2_single_noise(m, q, sigma, delta):
         borders[1][1],
         args=(q, m, sigma, delta),
         epsabs=EPSABS,
-        epsrel=EPSREL
+        epsrel=EPSREL,
     )[0]
 
 
 # ------------------
 # L1 equations single noise
 # ------------------
+
 
 def m_hat_equation_L1_single_noise(m, q, sigma, delta):
     borders = find_integration_borders_square(
@@ -603,13 +823,7 @@ def m_hat_equation_L1_single_noise(m, q, sigma, delta):
 
     args = {"m": m, "q": q, "sigma": sigma}
     domain_xi, domain_y = domains_double_line_constraint(
-        borders,
-        border_plus_L1,
-        border_minus_L1,
-        test_fun_upper_L1,
-        args,
-        args,
-        args,
+        borders, border_plus_L1, border_minus_L1, test_fun_upper_L1, args, args, args,
     )
 
     integral_value = 0.0
@@ -622,7 +836,7 @@ def m_hat_equation_L1_single_noise(m, q, sigma, delta):
             y_funs[1],
             args=(q, m, sigma, delta),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -637,13 +851,7 @@ def q_hat_equation_L1_single_noise(m, q, sigma, delta):
 
     args = {"m": m, "q": q, "sigma": sigma}
     domain_xi, domain_y = domains_double_line_constraint(
-        borders,
-        border_plus_L1,
-        border_minus_L1,
-        test_fun_upper_L1,
-        args,
-        args,
-        args,
+        borders, border_plus_L1, border_minus_L1, test_fun_upper_L1, args, args, args,
     )
 
     integral_value = 0.0
@@ -656,7 +864,7 @@ def q_hat_equation_L1_single_noise(m, q, sigma, delta):
             y_funs[1],
             args=(q, m, sigma, delta),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -671,13 +879,7 @@ def sigma_hat_equation_L1_single_noise(m, q, sigma, delta):
 
     args = {"m": m, "q": q, "sigma": sigma}
     domain_xi, domain_y = domains_double_line_constraint(
-        borders,
-        border_plus_L1,
-        border_minus_L1,
-        test_fun_upper_L1,
-        args,
-        args,
-        args,
+        borders, border_plus_L1, border_minus_L1, test_fun_upper_L1, args, args, args,
     )
 
     integral_value = 0.0
@@ -690,7 +892,7 @@ def sigma_hat_equation_L1_single_noise(m, q, sigma, delta):
             y_funs[1],
             args=(q, m, sigma, delta),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -729,7 +931,7 @@ def m_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
             y_funs[1],
             args=(q, m, sigma, delta, a),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -763,7 +965,7 @@ def q_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
             y_funs[1],
             args=(q, m, sigma, delta, a),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -797,10 +999,75 @@ def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
             y_funs[1],
             args=(q, m, sigma, delta, a),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
+
+
+# ------------------
+# Numerical Loss equations single noise
+# ------------------
+
+
+def hat_equations_numerical_loss_single_noise(
+    m, q, sigma, delta, precompute_proximal_func, loss_args
+):
+    # borders = [
+    #     [-MULT_INTEGRAL * np.sqrt((1 + delta)), MULT_INTEGRAL * np.sqrt((1 + delta))],
+    #     [-MULT_INTEGRAL * np.sqrt((1 + delta)), MULT_INTEGRAL * np.sqrt((1 + delta))],
+    # ]
+
+    x_range = romberg_linspace(
+        -MULT_INTEGRAL * np.sqrt((1 + delta)), MULT_INTEGRAL * np.sqrt((1 + delta))
+    )  # np.linspace(borders[0][0], borders[0][1], 2 ** K_ROMBERG + 1)
+    y_range = romberg_linspace(
+        -MULT_INTEGRAL * np.sqrt((1 + delta)), MULT_INTEGRAL * np.sqrt((1 + delta))
+    )
+
+    dx = x_range[1] - x_range[0]
+    dy = y_range[1] - y_range[0]
+
+    Xi, _ = np.meshgrid(x_range, y_range)
+
+    precom_gaussian = precompute_values_double_romb_integration(
+        _gaussian_function, x_range, y_range
+    )
+
+    precom_proximal, precom_Dproximal = precompute_proximal_func(
+        x_range, y_range, m, q, sigma, **loss_args,
+    )
+
+    precom_fout = (precom_proximal - np.sqrt(q) * Xi) / sigma
+    precom_Dfout = (precom_Dproximal - 1) / sigma
+
+    precom_Zout = precompute_values_double_romb_integration(
+        _ZoutBayes_single_noise_erm, x_range, y_range, args=[m, q, sigma, delta]
+    )
+    precom_foutBayes = precompute_values_double_romb_integration(
+        _foutBayes_single_noise_erm, x_range, y_range, args=[m, q, sigma, delta]
+    )
+
+    # print(
+    #     "prox {} Dprox {} fout {}  Dfout {} zout {} foutBayes {}".format(
+    #         precom_proximal.shape,
+    #         precom_Dproximal.shape,
+    #         precom_fout.shape,
+    #         precom_Dfout.shape,
+    #         precom_Zout.shape,
+    #         precom_foutBayes.shape,
+    #     )
+    # )
+
+    m_hat_values = precom_gaussian * precom_Zout * precom_foutBayes * precom_fout
+    q_hat_values = precom_gaussian * precom_Zout * precom_fout * precom_fout
+    sigma_hat_values = precom_gaussian * precom_Zout * precom_Dfout
+
+    m_hat_integral = double_romb_integration(m_hat_values, dx, dy)
+    q_hat_integral = double_romb_integration(q_hat_values, dx, dy)
+    sigma_hat_integral = double_romb_integration(sigma_hat_values, dx, dy)
+
+    return m_hat_integral, q_hat_integral, sigma_hat_integral
 
 
 # ------------------
@@ -829,7 +1096,7 @@ def q_hat_equation_BO_double_noise(m, q, sigma, delta_small, delta_large, eps):
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -861,7 +1128,7 @@ def m_hat_equation_L2_double_noise(m, q, sigma, delta_small, delta_large, eps):
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -888,7 +1155,7 @@ def q_hat_equation_L2_double_noise(m, q, sigma, delta_small, delta_large, eps):
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -915,7 +1182,7 @@ def sigma_hat_equation_L2_double_noise(m, q, sigma, delta_small, delta_large, ep
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -961,7 +1228,7 @@ def m_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large, eps
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps, a),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -997,7 +1264,7 @@ def q_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large, eps
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps, a),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
@@ -1033,16 +1300,20 @@ def sigma_hat_equation_Huber_double_noise(m, q, sigma, delta_small, delta_large,
             y_funs[1],
             args=(q, m, sigma, delta_small, delta_large, eps, a),
             epsabs=EPSABS,
-            epsrel=EPSREL
+            epsrel=EPSREL,
         )[0]
 
     return integral_value
+
 
 # ------------------
 # BayesOpt equations decorrelated noise
 # ------------------
 
-def q_hat_equation_BO_decorrelated_noise(m, q, sigma, delta_small, delta_large, eps, beta):
+
+def q_hat_equation_BO_decorrelated_noise(
+    m, q, sigma, delta_small, delta_large, eps, beta
+):
     borders = find_integration_borders_square(
         lambda y, xi: q_integral_BO_decorrelated_noise(
             y, xi, q, m, sigma, delta_small, delta_large, eps, beta
@@ -1066,11 +1337,15 @@ def q_hat_equation_BO_decorrelated_noise(m, q, sigma, delta_small, delta_large, 
 
     return integral_value
 
+
 # ------------------
 # L2 equations decorrelated noise
 # ------------------
 
-def m_hat_equation_L2_decorrelated_noise(m, q, sigma, delta_small, delta_large, eps, beta):
+
+def m_hat_equation_L2_decorrelated_noise(
+    m, q, sigma, delta_small, delta_large, eps, beta
+):
     borders = find_integration_borders_square(
         lambda y, xi: m_integral_L2_double_noise(
             y, xi, q, m, sigma, delta_small, delta_large, eps, beta
@@ -1095,7 +1370,9 @@ def m_hat_equation_L2_decorrelated_noise(m, q, sigma, delta_small, delta_large, 
     return integral_value
 
 
-def q_hat_equation_L2_decorrelated_noise(m, q, sigma, delta_small, delta_large, eps, beta):
+def q_hat_equation_L2_decorrelated_noise(
+    m, q, sigma, delta_small, delta_large, eps, beta
+):
     borders = find_integration_borders_square(
         lambda y, xi: q_integral_L2_double_noise(
             y, xi, q, m, sigma, delta_small, delta_large, eps, beta
@@ -1120,7 +1397,9 @@ def q_hat_equation_L2_decorrelated_noise(m, q, sigma, delta_small, delta_large, 
     return integral_value
 
 
-def sigma_hat_equation_L2_decorrelated_noise(m, q, sigma, delta_small, delta_large, eps, beta):
+def sigma_hat_equation_L2_decorrelated_noise(
+    m, q, sigma, delta_small, delta_large, eps, beta
+):
     borders = find_integration_borders_square(
         lambda y, xi: sigma_integral_L2_double_noise(
             y, xi, q, m, sigma, delta_small, delta_large, eps, beta
@@ -1144,6 +1423,7 @@ def sigma_hat_equation_L2_decorrelated_noise(m, q, sigma, delta_small, delta_lar
 
     return integral_value
 
+
 # ------------------
 # L1 equations decorrelated noise
 # ------------------
@@ -1152,7 +1432,10 @@ def sigma_hat_equation_L2_decorrelated_noise(m, q, sigma, delta_small, delta_lar
 #  Huber equations decorrelated noise
 # ------------------
 
-def m_hat_equation_Huber_decorrelated_noise(m, q, sigma, delta_small, delta_large, eps, beta, a):
+
+def m_hat_equation_Huber_decorrelated_noise(
+    m, q, sigma, delta_small, delta_large, eps, beta, a
+):
     borders = find_integration_borders_square(
         lambda y, xi: m_integral_Huber_decorrelated_noise(
             y, xi, q, m, sigma, delta_small, delta_large, eps, beta, a
@@ -1186,7 +1469,9 @@ def m_hat_equation_Huber_decorrelated_noise(m, q, sigma, delta_small, delta_larg
     return integral_value
 
 
-def q_hat_equation_Huber_decorrelated_noise(m, q, sigma, delta_small, delta_large, eps, beta, a):
+def q_hat_equation_Huber_decorrelated_noise(
+    m, q, sigma, delta_small, delta_large, eps, beta, a
+):
     borders = find_integration_borders_square(
         lambda y, xi: q_integral_Huber_decorrelated_noise(
             y, xi, q, m, sigma, delta_small, delta_large, eps, beta, a
@@ -1220,7 +1505,9 @@ def q_hat_equation_Huber_decorrelated_noise(m, q, sigma, delta_small, delta_larg
     return integral_value
 
 
-def sigma_hat_equation_Huber_decorrelated_noise(m, q, sigma, delta_small, delta_large, eps, beta, a):
+def sigma_hat_equation_Huber_decorrelated_noise(
+    m, q, sigma, delta_small, delta_large, eps, beta, a
+):
     borders = find_integration_borders_square(
         lambda y, xi: sigma_integral_Huber_decorrelated_noise(
             y, xi, q, m, sigma, delta_small, delta_large, eps, beta, a

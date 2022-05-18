@@ -16,9 +16,10 @@ if __name__ == "__main__":
             "loss_name": "L2",
             "alpha_min": 0.01,
             "alpha_max": 100,
-            # "alpha_pts": 36,
-            "alpha_pts_theoretical": 36,
-            "alpha_pts_experimental": 4,
+            "alpha_pts": 36,
+            # "alpha_pts_theoretical": 36,
+            # "alpha_pts_experimental": 4,
+            "reg_param": 1.0,
             "delta": 0.5,
             "delta_small": delta_small,
             "delta_large": delta_large,
@@ -26,7 +27,7 @@ if __name__ == "__main__":
             "n_features": 500,
             "repetitions": 4,
             # "beta": 0.0,
-            "experiment_type": "reg_param optimal exp",
+            "experiment_type": "theory",
         }
         for a in aa
     ]

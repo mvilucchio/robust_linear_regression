@@ -2,10 +2,12 @@ import numpy as np
 from numba import njit
 import src.numerical_functions as numfun
 from multiprocessing import Pool
+from tqdm.auto import tqdm
+
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
 BLEND = 0.5
-TOL_FPE = 5e-9
+TOL_FPE = 1e-3  # 5e-9
 
 
 def state_equations(
@@ -55,6 +57,45 @@ def _find_fixed_point(
     return m, q, sigma
 
 
+def no_parallel_different_alpha_observables_fpeqs(
+    var_func,
+    var_hat_func,
+    funs=[lambda m, q, sigma: 1 + q - 2 * m],
+    alpha_1=0.01,
+    alpha_2=100,
+    n_alpha_points=16,
+    reg_param=0.1,
+    initial_cond=[0.6, 0.0, 0.0],
+    var_hat_kwargs={},
+):
+    n_observables = len(funs)
+    alphas = np.logspace(
+        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
+    )
+    out_values = np.empty((n_observables, n_alpha_points))
+    results = [None] * len(alphas)
+
+    for idx, a in enumerate(tqdm(alphas)):
+        results[idx] = _find_fixed_point(
+            a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs
+        )
+    # inputs = [
+    #     (a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs)
+    #     for a in alphas
+    # ]
+
+    # with Pool() as pool:
+    #     results = pool.starmap(_find_fixed_point, inputs)
+
+    for idx, (m, q, sigma) in enumerate(results):
+        fixed_point_sols = {"m": m, "q": q, "sigma": sigma}
+        for jdx, f in enumerate(funs):
+            out_values[jdx, idx] = f(**fixed_point_sols)
+
+    out_list = [out_values[idx, :] for idx in range(len(funs))]
+    return alphas, out_list
+
+
 def different_alpha_observables_fpeqs(
     var_func,
     var_hat_func,
@@ -77,7 +118,7 @@ def different_alpha_observables_fpeqs(
         for a in alphas
     ]
 
-    with Pool(processes=2) as pool:
+    with Pool() as pool:
         results = pool.starmap(_find_fixed_point, inputs)
 
     for idx, (m, q, sigma) in enumerate(results):
@@ -102,7 +143,9 @@ def different_reg_param_gen_error(
 ):
     n_observables = len(funs)
     reg_params = np.logspace(
-        np.log(reg_param_1) / np.log(10), np.log(reg_param_2) / np.log(10), n_reg_param_points
+        np.log(reg_param_1) / np.log(10),
+        np.log(reg_param_2) / np.log(10),
+        n_reg_param_points,
     )
     out_values = np.empty((n_observables, n_reg_param_points))
 
@@ -122,7 +165,9 @@ def different_reg_param_gen_error(
     out_list = [out_values[idx, :] for idx in range(len(funs))]
     return reg_params, out_list
 
+
 # --------------------------
+
 
 @njit(error_model="numpy", fastmath=True)
 def var_func_BO(
@@ -143,9 +188,15 @@ def var_hat_func_BO_num_single_noise(m, q, sigma, alpha, delta):
     return q_hat, q_hat, q_hat
 
 
-def var_hat_func_BO_double_noise(m, q, sigma, alpha, delta_small, delta_large, percentage):
+def var_hat_func_BO_double_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage
+):
     raise NotImplementedError
-    q_hat = alpha * (1 + (1 - percentage) * delta_large + percentage * delta_small - q) / ((1 + delta_small - q) * (1 + delta_large - q))
+    q_hat = (
+        alpha
+        * (1 + (1 - percentage) * delta_large + percentage * delta_small - q)
+        / ((1 + delta_small - q) * (1 + delta_large - q))
+    )
     return q_hat, q_hat, q_hat
 
 
@@ -158,9 +209,15 @@ def var_hat_func_BO_num_double_noise(
     return q_hat, q_hat, q_hat
 
 
-def var_hat_func_BO_decorrelated_noise(m, q, sigma, alpha, delta_small, delta_large, percentage, beta):
+def var_hat_func_BO_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta
+):
     raise NotImplementedError
-    q_hat = alpha * (1 + (1 - percentage) * delta_large + percentage * delta_small - q) / ((1 + delta_small - q) * (1 + delta_large - q))
+    q_hat = (
+        alpha
+        * (1 + (1 - percentage) * delta_large + percentage * delta_small - q)
+        / ((1 + delta_small - q) * (1 + delta_large - q))
+    )
     return q_hat, q_hat, q_hat
 
 
@@ -172,7 +229,9 @@ def var_hat_func_BO_num_decorrelated_noise(
     )
     return q_hat, q_hat, q_hat
 
+
 # --------------------------
+
 
 @njit(error_model="numpy", fastmath=True)
 def var_func_L2(
@@ -230,10 +289,20 @@ def var_hat_func_L2_decorrelated_noise(
     m, q, sigma, alpha, delta_small, delta_large, percentage, beta
 ):
     delta_eff = (1 - percentage) * delta_small + percentage * delta_large
-    intermediate_val = (1 + percentage * (beta - 1))
+    intermediate_val = 1 + percentage * (beta - 1)
 
     m_hat = alpha * intermediate_val / (1 + sigma)
-    q_hat = alpha * (1 + q + delta_eff + percentage * (beta**2 - 1) - 2 * np.abs(m) * intermediate_val) / ((1 + sigma) ** 2)
+    q_hat = (
+        alpha
+        * (
+            1
+            + q
+            + delta_eff
+            + percentage * (beta ** 2 - 1)
+            - 2 * np.abs(m) * intermediate_val
+        )
+        / ((1 + sigma) ** 2)
+    )
     sigma_hat = alpha / (1 + sigma)
     return m_hat, q_hat, sigma_hat
 
@@ -289,4 +358,77 @@ def var_hat_func_Huber_num_decorrelated_noise(
     sigma_hat = -alpha * numfun.sigma_hat_equation_Huber_decorrelated_noise(
         m, q, sigma, delta_small, delta_large, percentage, beta, a,
     )
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_numerical_loss_single_noise(
+    m, q, sigma, alpha, delta, precompute_proximal_func, loss_args
+):
+    m_int, q_int, sigma_int = numfun.hat_equations_numerical_loss_single_noise(
+        m, q, sigma, delta, precompute_proximal_func, loss_args
+    )
+    # print("m_int {} q_int {} sigma_int {}".format(m_int, q_int, sigma_int))
+    m_hat = alpha * m_int
+    q_hat = alpha * q_int
+    sigma_hat = -alpha * sigma_int
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_numerical_loss_double_noise(
+    m,
+    q,
+    sigma,
+    alpha,
+    delta_small,
+    delta_large,
+    percentage,
+    loss_derivative,
+    loss_second_derivative,
+    loss_args=None,
+):
+    m_int, q_int, sigma_int = numfun.hat_equations_numerical_loss_double_noise(
+        m,
+        q,
+        sigma,
+        delta_small,
+        delta_large,
+        percentage,
+        loss_derivative,
+        loss_second_derivative,
+        loss_args=loss_args,
+    )
+    m_hat = alpha * m_int
+    q_hat = alpha * q_int
+    sigma_hat = -alpha * sigma_int
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_numerical_loss_decorrelated_noise(
+    m,
+    q,
+    sigma,
+    alpha,
+    delta_small,
+    delta_large,
+    percentage,
+    beta,
+    loss_derivative,
+    loss_second_derivative,
+    loss_args=None,
+):
+    m_int, q_int, sigma_int = numfun.hat_equations_numerical_loss_decorrelated_noise(
+        m,
+        q,
+        sigma,
+        delta_small,
+        delta_large,
+        percentage,
+        beta,
+        loss_derivative,
+        loss_second_derivative,
+        loss_args=loss_args,
+    )
+    m_hat = alpha * m_int
+    q_hat = alpha * q_int
+    sigma_hat = -alpha * sigma_int
     return m_hat, q_hat, sigma_hat

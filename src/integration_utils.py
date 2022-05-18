@@ -1,11 +1,12 @@
 import numpy as np
 from scipy.integrate import romb
 import unittest
+from numba import njit
 
 MULT_INTEGRAL = 10
 TOL_INT = 1e-6
 N_TEST_POINTS = 100
-K_ROMBERG = 10
+K_ROMBERG = 12
 
 # if _check_nested_list(square_borders):
 #     max_range = square_borders[0][1]
@@ -24,7 +25,7 @@ def _check_nested_list(nested_list):
 
 
 def find_integration_borders_square(
-    fun, scale1, scale2, mult=MULT_INTEGRAL, tol=TOL_INT, n_points=N_TEST_POINTS
+    fun, scale1, scale2, mult=MULT_INTEGRAL, tol=TOL_INT, n_points=N_TEST_POINTS, args=[]
 ):
     borders = [[-mult * scale1, mult * scale1], [-mult * scale2, mult * scale2]]
 
@@ -35,7 +36,7 @@ def find_integration_borders_square(
                 if idx == 0:
                     max_val = np.max(
                         [
-                            fun(borders[idx][jdx], pt)
+                            fun(borders[idx][jdx], pt, *args)
                             for pt in np.linspace(
                                 borders[1 if idx == 0 else 0][0],
                                 borders[1 if idx == 0 else 0][1],
@@ -46,7 +47,7 @@ def find_integration_borders_square(
                 else:
                     max_val = np.max(
                         [
-                            fun(pt, borders[idx][jdx])
+                            fun(pt, borders[idx][jdx], *args)
                             for pt in np.linspace(
                                 borders[1 if idx == 0 else 0][0],
                                 borders[1 if idx == 0 else 0][1],
@@ -286,9 +287,15 @@ def domains_double_line_constraint_only_inside(
     return domain_x, domain_y
 
 
-def double_romb_integration(fun, x_lower, x_upper, y_lower, y_upper, args=[]):
-    x = np.linspace(x_lower, x_upper, 2**K_ROMBERG + 1)
-    y = np.linspace(y_lower, y_upper, 2**K_ROMBERG + 1)
+def romberg_linspace(lower, upper):
+    return np.linspace(lower, upper, 2 ** K_ROMBERG + 1)
+
+
+def full_procedure_double_romb_integration(
+    fun, x_lower, x_upper, y_lower, y_upper, args=[]
+):
+    x = np.linspace(x_lower, x_upper, 2 ** K_ROMBERG + 1)
+    y = np.linspace(y_lower, y_upper, 2 ** K_ROMBERG + 1)
 
     dx = x[1] - x[0]
     dy = y[1] - y[0]
@@ -297,4 +304,25 @@ def double_romb_integration(fun, x_lower, x_upper, y_lower, y_upper, args=[]):
 
     F = fun(X, Y, *args)
 
+    return romb(romb(F, dy), dx)
+
+
+def precompute_values_double_romb_integration(fun, x_range, y_range, args=[]):
+    # if not isinstance(x_range, list) and not isinstance(y_range, list):
+    #     x = x_range
+    #     y = y_range
+    # elif isinstance(x_range, list) and isinstance(y_range, list):
+    #     if
+
+    dx = x_range[1] - x_range[0]
+    dy = y_range[1] - y_range[0]
+
+    X, Y = np.meshgrid(x_range, y_range)
+
+    F = fun(X, Y, *args)
+
+    return F
+
+
+def double_romb_integration(F, dx, dy):
     return romb(romb(F, dy), dx)
