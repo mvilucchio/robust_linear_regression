@@ -1,12 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import src.plotting_utils as pu
-from src.utils import (
-    check_saved,
-    load_file,
-    save_file,
-    experiment_runner,
-)
+from src.utils import experiment_runner
 
 save = False
 
@@ -26,7 +21,7 @@ if __name__ == "__main__":
         {
             "loss_name": loss_name,
             "alpha_min": 0.01,
-            "alpha_max": 2000,
+            "alpha_max": 1000,
             "alpha_pts": 20,
             "reg_param": reg_param,
             "repetitions": 10,
@@ -53,7 +48,7 @@ if __name__ == "__main__":
             "delta_small": delta_small,
             "delta_large": delta_large,
             "percentage": percentage,
-            "beta" : beta,
+            "beta": beta,
             "a": 1.0,
             "experiment_type": "theory",
         }

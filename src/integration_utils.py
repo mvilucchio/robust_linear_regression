@@ -6,7 +6,7 @@ from numba import njit
 MULT_INTEGRAL = 10
 TOL_INT = 1e-6
 N_TEST_POINTS = 100
-K_ROMBERG = 12
+K_ROMBERG = 13
 
 # if _check_nested_list(square_borders):
 #     max_range = square_borders[0][1]

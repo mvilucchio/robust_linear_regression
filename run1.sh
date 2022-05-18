@@ -16,6 +16,6 @@ source venv/troiani/bin/activate
 
 cd robust_linear_regression
 
-srun python optimal_experiments_Huber_1.py
+srun python custom_loss_data.py
 
 deactivate
