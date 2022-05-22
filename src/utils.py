@@ -442,7 +442,7 @@ def bayes_optimal_runner(**kwargs):
                 initial_condition = [m, q, sigma]
                 break
 
-        var_function = fpe.var_hat_func_BO_decorrelated_noise
+        var_function = fpe.var_hat_func_BO_num_decorrelated_noise
     else:
         if double_noise:
             var_hat_kwargs = {

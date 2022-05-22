@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import minimize, Bounds
 import src.fpeqs as fp
 from multiprocessing import Pool
+
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
 SMALLEST_REG_PARAM = 1e-3
@@ -25,7 +26,9 @@ def _find_optimal_reg_param_gen_error(
         return 1 + q - 2 * m
 
     # bnds = [(SMALLEST_REG_PARAM, None)]
-    obj = minimize(minimize_fun, x0=inital_value, method="Nelder-Mead", options={"ftol" : FTOL}) # bounds=bnds, , "maxiter":MAX_ITER
+    obj = minimize(
+        minimize_fun, x0=inital_value, method="Nelder-Mead", options={"ftol": FTOL}
+    )  # bounds=bnds, , "maxiter":MAX_ITER
     if obj.success:
         fun_val = obj.fun
         reg_param_opt = obj.x
@@ -52,7 +55,10 @@ def optimal_lambda(
     init_param = 0.1 * np.random.random() + 0.1
     # init_param = []
 
-    inputs = [(a, var_func, var_hat_func, initial_cond, var_hat_kwargs, init_param) for a in alphas]
+    inputs = [
+        (a, var_func, var_hat_func, initial_cond, var_hat_kwargs, init_param)
+        for a in alphas
+    ]
 
     with Pool() as pool:
         results = pool.starmap(_find_optimal_reg_param_gen_error, inputs)
@@ -71,7 +77,9 @@ def _find_optimal_huber_parameter_gen_error(
         var_hat_kwargs.update({"a": a})
         m, q, _ = fp.state_equations(
             fp.var_func_L2,
-            fp.var_hat_func_Huber_num_double_noise if double_noise else fp.var_hat_func_Huber_num_single_noise,
+            fp.var_hat_func_Huber_num_double_noise
+            if double_noise
+            else fp.var_hat_func_Huber_num_single_noise,
             reg_param=reg_param,
             alpha=alpha,
             init=initial,
@@ -79,8 +87,10 @@ def _find_optimal_huber_parameter_gen_error(
         )
         return 1 + q - 2 * m
 
-    # bnds = [(SMALLEST_HUBER_PARAM, None)]
-    obj = minimize(error_func, x0=inital_value, method="Nelder-Mead", options={"maxiter": MAX_ITER}) # bounds=bnds, 
+    #  bnds = [(SMALLEST_HUBER_PARAM, None)]
+    obj = minimize(
+        error_func, x0=inital_value, method="Nelder-Mead", options={"maxiter": MAX_ITER}
+    )  # bounds=bnds,
     if obj.success:
         fun_val = obj.fun
         a_opt = obj.x
@@ -106,7 +116,9 @@ def optimal_huber_parameter(
     fun_values = np.zeros(n_alpha_points)
     a_opt = np.zeros(n_alpha_points)
 
-    inputs = [(a, double_noise, reg_param, initial_cond, var_hat_kwargs, 1.0) for a in alphas]
+    inputs = [
+        (a, double_noise, reg_param, initial_cond, var_hat_kwargs, 1.0) for a in alphas
+    ]
 
     with Pool() as pool:
         results = pool.starmap(_find_optimal_huber_parameter_gen_error, inputs)
@@ -135,7 +147,12 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
         return 1 + q - 2 * m
 
     # bnds = [(SMALLEST_REG_PARAM, None), (SMALLEST_REG_PARAM, None)]
-    obj = minimize(minimize_fun, x0=inital_values, method="Nelder-Mead", options={"maxiter": MAX_ITER}) #, bounds=bnds
+    obj = minimize(
+        minimize_fun,
+        x0=inital_values,
+        method="Nelder-Mead",
+        options={"maxiter": MAX_ITER},
+    )  # , bounds=bnds
     if obj.success:
         fun_val = obj.fun
         reg_param_opt, a_opt = obj.x
@@ -161,13 +178,18 @@ def optimal_reg_param_and_huber_parameter(
     reg_param_opt = np.zeros(n_alpha_points)
     a_opt = np.zeros(n_alpha_points)
 
-    inital_reg_param = 0.1 * np.random.random() + 0.1
-    inital_hub_param = 0.1 * np.random.random() + 0.1
+    inital_reg_param = 0.2 * np.random.random() + 0.9
+    inital_hub_param = 0.2 * np.random.random() + 0.9
 
-    inputs = [(a, var_hat_func, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param]) for a in alphas]
+    inputs = [
+        (a, var_hat_func, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param])
+        for a in alphas
+    ]
 
     with Pool() as pool:
-        results = pool.starmap(_find_optimal_reg_param_and_huber_parameter_gen_error, inputs)
+        results = pool.starmap(
+            _find_optimal_reg_param_and_huber_parameter_gen_error, inputs
+        )
 
     for idx, (e, regp, a) in enumerate(results):
         fun_values[idx] = e

@@ -1,13 +1,15 @@
 import numpy as np
 from numba import njit
 import src.numerical_functions as numfun
+
 from multiprocessing import Pool
 from tqdm.auto import tqdm
 
+# from mpi4py import MPI
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
 BLEND = 0.5
-TOL_FPE = 1e-3  # 5e-9
+TOL_FPE = 5e-9
 
 
 def state_equations(
@@ -94,6 +96,62 @@ def no_parallel_different_alpha_observables_fpeqs(
 
     out_list = [out_values[idx, :] for idx in range(len(funs))]
     return alphas, out_list
+
+
+def MPI_different_alpha_observables_fpeqs(
+    var_func,
+    var_hat_func,
+    funs=[lambda m, q, sigma: 1 + q - 2 * m],
+    alpha_1=0.01,
+    alpha_2=100,
+    n_alpha_points=16,
+    reg_param=0.1,
+    initial_cond=[0.6, 0.0, 0.0],
+    var_hat_kwargs={},
+):
+    comm = MPI.COMM_WORLD
+    i = comm.Get_rank()
+    pool_size = comm.Get_size()
+
+    n_observables = len(funs)
+    alphas = np.logspace(
+        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), pool_size
+    )
+    alpha = alphas[i]
+    out_values = np.empty((n_observables, n_alpha_points))
+
+    m, q, sigma = _find_fixed_point(
+        alpha, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs
+    )
+
+    ms = np.empty(pool_size)
+    qs = np.empty(pool_size)
+    sigmas = np.empty(pool_size)
+
+    if i == 0:
+        ms[0] = m
+        qs[0] = q
+        sigmas[0] = sigma
+
+        for j in range(1, pool_size):
+            ms[j] = comm.recv(source=j)
+        for j in range(1, pool_size):
+            qs[j] = comm.recv(source=j)
+        for j in range(1, pool_size):
+            sigmas[j] = comm.recv(source=j)
+
+        for idx, (mm, qq, ssigma) in enumerate(zip(ms, qs, sigmas)):
+            fixed_point_sols = {"m": mm, "q": qq, "sigma": ssigma}
+            for jdx, f in enumerate(funs):
+                out_values[jdx, idx] = f(**fixed_point_sols)
+
+        out_list = [out_values[idx, :] for idx in range(len(funs))]
+        return alphas, out_list
+    else:
+        print("Process {} sending {}".format(i, reg_param))
+        comm.send(m, dest=0)
+        comm.send(q, dest=0)
+        comm.send(sigma, dest=0)
 
 
 def different_alpha_observables_fpeqs(

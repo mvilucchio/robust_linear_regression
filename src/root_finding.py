@@ -1,4 +1,3 @@
-from audioop import reverse
 import numpy as np
 from numba import njit
 
@@ -23,17 +22,11 @@ def brent_root_finder(fun, xa, xb, xtol, rtol, max_iter, args):
     spre = 0.0
     scur = 0.0
 
-    # , fpre, fcur, sbis
     # /* the tolerance is 2*delta */
-    # double delta;
-    # double stry, dpre, dblk;
-    # int i;
-    #  solver_stats->error_num = INPROGRESS;
 
     fpre = fun(xpre, *args)
     fcur = fun(xcur, *args)
 
-    # solver_stats->funcalls = 2;
     if fpre * fcur > 0:
         raise ValueError("The endpoints should have different signs.")
 
@@ -42,9 +35,7 @@ def brent_root_finder(fun, xa, xb, xtol, rtol, max_iter, args):
     if fcur == 0:
         return xcur
 
-    # solver_stats->iterations = 0;
     for i in range(max_iter):
-        # solver_stats->iterations++;
         if fpre != 0 and fcur != 0 and (np.sign(fpre) != np.sign(fcur)):
             xblk = xpre
             fblk = fpre
@@ -63,7 +54,6 @@ def brent_root_finder(fun, xa, xb, xtol, rtol, max_iter, args):
         sbis = (xblk - xcur) / 2
 
         if fcur == 0 or np.abs(sbis) < delta:
-            # solver_stats->error_num = CONVERGED;
             return xcur
 
         if np.abs(spre) > delta and np.abs(fcur) < np.abs(fpre):
@@ -97,7 +87,5 @@ def brent_root_finder(fun, xa, xb, xtol, rtol, max_iter, args):
             xcur += delta if sbis > 0 else -delta
 
         fcur = fun(xcur, *args)
-        # solver_stats->funcalls++;
 
-    # solver_stats->error_num = CONVERR;
     return xcur

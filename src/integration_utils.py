@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.integrate import romb
-import unittest
 from numba import njit
 
 MULT_INTEGRAL = 10

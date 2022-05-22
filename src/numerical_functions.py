@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.integrate import dblquad
-from scipy.optimize import root_scalar
 from numba import njit, vectorize
 from src.loss_functions import proximal_loss_double_quad
 from src.integration_utils import (
@@ -27,35 +26,21 @@ def precompute_proximals_loss_double_quad_grid(
     x_range, y_range, m, q, sigma, width,
 ):
     # create the array if it is not there
-    #  print("width ", type(width))
+
     shape = (len(x_range), len(y_range))
     proximals = np.empty(shape)
     proximal_derivatives = np.empty(shape)
-
-    # print("m : {} q : {} sigma : {}".format(m, q, sigma))
 
     with np.nditer(
         [proximals, proximal_derivatives], flags=["multi_index"], op_flags=["readwrite"]
     ) as it:
         for prox, prox_der in it:
-            # print(
-            #     "y {:.7f} q {:.7f} sigma {:.7f} width {:.1f}".format(
-            #         y_range[it.multi_index[0]],
-            #         np.sqrt(q) * x_range[it.multi_index[1]],
-            #         sigma,
-            #         width,
-            #     ),
-            #     end="",
-            # )
             prox[...], prox_der[...] = proximal_loss_double_quad(
                 y_range[it.multi_index[0]],
                 np.sqrt(q) * x_range[it.multi_index[1]],
                 sigma,
                 width,
             )
-            # print("", end="\r")
-
-    #  print("------- prox {} Dprox {}".format(proximals.shape, proximal_derivatives.shape))
 
     return proximals, proximal_derivatives
 
@@ -1013,11 +998,6 @@ def sigma_hat_equation_Huber_single_noise(m, q, sigma, delta, a):
 def hat_equations_numerical_loss_single_noise(
     m, q, sigma, delta, precompute_proximal_func, loss_args
 ):
-    # borders = [
-    #     [-MULT_INTEGRAL * np.sqrt((1 + delta)), MULT_INTEGRAL * np.sqrt((1 + delta))],
-    #     [-MULT_INTEGRAL * np.sqrt((1 + delta)), MULT_INTEGRAL * np.sqrt((1 + delta))],
-    # ]
-
     x_range = romberg_linspace(
         -MULT_INTEGRAL * np.sqrt((1 + delta)), MULT_INTEGRAL * np.sqrt((1 + delta))
     )  # np.linspace(borders[0][0], borders[0][1], 2 ** K_ROMBERG + 1)
@@ -1047,17 +1027,6 @@ def hat_equations_numerical_loss_single_noise(
     precom_foutBayes = precompute_values_double_romb_integration(
         _foutBayes_single_noise_erm, x_range, y_range, args=[m, q, sigma, delta]
     )
-
-    # print(
-    #     "prox {} Dprox {} fout {}  Dfout {} zout {} foutBayes {}".format(
-    #         precom_proximal.shape,
-    #         precom_Dproximal.shape,
-    #         precom_fout.shape,
-    #         precom_Dfout.shape,
-    #         precom_Zout.shape,
-    #         precom_foutBayes.shape,
-    #     )
-    # )
 
     m_hat_values = precom_gaussian * precom_Zout * precom_foutBayes * precom_fout
     q_hat_values = precom_gaussian * precom_Zout * precom_fout * precom_fout
