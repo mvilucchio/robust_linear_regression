@@ -4,8 +4,8 @@
 #SBATCH --tasks-per-node 36
 #SBATCH --mem 120G
 #SBATCH --time 20:00:00
-#SBATCH -o output.out
-#SBATCH -e error.out
+#SBATCH -o robust_linear_regression/output1Huber.out
+#SBATCH -e robust_linear_regression/error1Huber.out
 #SBATCH --partition=parallel
 
 module load gcc
@@ -16,6 +16,6 @@ source venv/troiani/bin/activate
 
 cd robust_linear_regression
 
-srun python custom_loss_data.py
+srun python optimal_experiments_Huber_decorrerlated_1.py
 
 deactivate
