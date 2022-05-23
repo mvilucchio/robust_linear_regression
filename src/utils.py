@@ -6,6 +6,7 @@ import src.fpeqs as fpe
 from src.optimal_lambda import (
     optimal_lambda,
     optimal_reg_param_and_huber_parameter,
+    no_parallel_optimal_reg_param_and_huber_parameter,
 )
 
 
@@ -754,7 +755,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
 
             var_hat_func = fpe.var_hat_func_Huber_num_single_noise
 
-    alphas, errors, lambdas, huber_params = optimal_reg_param_and_huber_parameter(
+    (alphas, errors, lambdas, huber_params,) = optimal_reg_param_and_huber_parameter(
         var_hat_func=var_hat_func,
         alpha_1=kwargs["alpha_min"],
         alpha_2=kwargs["alpha_max"],

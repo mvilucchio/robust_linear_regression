@@ -5,10 +5,11 @@ from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-SMALLEST_REG_PARAM = 1e-3
-SMALLEST_HUBER_PARAM = 1e-3
+SMALLEST_REG_PARAM = 1e-5
+SMALLEST_HUBER_PARAM = 1e-2
 MAX_ITER = 2500
-FTOL = 1e-8
+XATOL = 1e-2
+FATOL = 1e-2
 
 
 def _find_optimal_reg_param_gen_error(
@@ -25,10 +26,14 @@ def _find_optimal_reg_param_gen_error(
         )
         return 1 + q - 2 * m
 
-    # bnds = [(SMALLEST_REG_PARAM, None)]
+    bnds = [(SMALLEST_REG_PARAM, None)]
     obj = minimize(
-        minimize_fun, x0=inital_value, method="Nelder-Mead", options={"ftol": FTOL}
-    )  # bounds=bnds, , "maxiter":MAX_ITER
+        minimize_fun,
+        x0=inital_value,
+        method="Nelder-Mead",
+        bounds=bnds,
+        options={"xatol": XATOL, "fatol": FATOL},
+    )  # , , "maxiter":MAX_ITER
     if obj.success:
         fun_val = obj.fun
         reg_param_opt = obj.x
@@ -87,10 +92,14 @@ def _find_optimal_huber_parameter_gen_error(
         )
         return 1 + q - 2 * m
 
-    #  bnds = [(SMALLEST_HUBER_PARAM, None)]
+    bnds = [(SMALLEST_HUBER_PARAM, None)]
     obj = minimize(
-        error_func, x0=inital_value, method="Nelder-Mead", options={"maxiter": MAX_ITER}
-    )  # bounds=bnds,
+        error_func,
+        x0=inital_value,
+        method="Nelder-Mead",
+        bounds=bnds,
+        options={"xatol": XATOL, "fatol": FATOL},
+    )  # ,
     if obj.success:
         fun_val = obj.fun
         a_opt = obj.x
@@ -146,13 +155,14 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
         )
         return 1 + q - 2 * m
 
-    # bnds = [(SMALLEST_REG_PARAM, None), (SMALLEST_REG_PARAM, None)]
+    bnds = [(SMALLEST_REG_PARAM, None), (SMALLEST_HUBER_PARAM, None)]
     obj = minimize(
         minimize_fun,
         x0=inital_values,
-        method="Nelder-Mead",
-        options={"maxiter": MAX_ITER},
-    )  # , bounds=bnds
+        # method="Nelder-Mead",
+        bounds=bnds,
+        # options={"xatol": XATOL, "fatol": FATOL, "adaptive": True,},
+    )
     if obj.success:
         fun_val = obj.fun
         reg_param_opt, a_opt = obj.x
@@ -195,5 +205,42 @@ def optimal_reg_param_and_huber_parameter(
         fun_values[idx] = e
         reg_param_opt[idx] = regp
         a_opt[idx] = a
+
+    return alphas, fun_values, reg_param_opt, a_opt
+
+
+def no_parallel_optimal_reg_param_and_huber_parameter(
+    var_hat_func=fp.var_hat_func_Huber_num_double_noise,
+    alpha_1=0.01,
+    alpha_2=100,
+    n_alpha_points=16,
+    initial_cond=[0.6, 0.0, 0.0],
+    var_hat_kwargs={},
+):
+    alphas = np.logspace(
+        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
+    )
+
+    initial = initial_cond
+    fun_values = np.zeros(n_alpha_points)
+    reg_param_opt = np.zeros(n_alpha_points)
+    a_opt = np.zeros(n_alpha_points)
+
+    inital_reg_param = 0.2 * np.random.random() + 0.9
+    inital_hub_param = 0.2 * np.random.random() + 0.9
+
+    inputs = [
+        (a, var_hat_func, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param])
+        for a in alphas
+    ]
+
+    for idx, a in enumerate(alphas):
+        (
+            fun_values[idx],
+            reg_param_opt[idx],
+            a_opt[idx],
+        ) = _find_optimal_reg_param_and_huber_parameter_gen_error(
+            a, var_hat_func, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param]
+        )
 
     return alphas, fun_values, reg_param_opt, a_opt

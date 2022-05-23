@@ -167,6 +167,22 @@ def ZoutBayes_decorrelated_noise(y, omega, V, delta_small, delta_large, eps, bet
 
 
 @njit(error_model="numpy", fastmath=True)
+def DZoutBayes_decorrelated_noise(y, omega, V, delta_small, delta_large, eps, beta):
+    small_exponential = np.exp(-((y - omega) ** 2) / (2 * (V + delta_small))) / np.sqrt(
+        2 * np.pi
+    )
+    large_exponential = np.exp(
+        -((y - beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
+    ) / np.sqrt(2 * np.pi)
+
+    return (1 - eps) * small_exponential * (y - omega) / np.power(
+        V + delta_small, 3 / 2
+    ) + eps * beta * large_exponential * (y - beta * omega) / np.power(
+        beta ** 2 * V + delta_large, 3 / 2
+    )
+
+
+@njit(error_model="numpy", fastmath=True)
 def _foutBayes_decorrelated_noise_erm(
     y, xi, m, q, sigma, delta_small, delta_large, eps, beta
 ):
@@ -637,10 +653,7 @@ def m_integral_Huber_decorrelated_noise(
     return (
         np.exp(-(xi ** 2) / 2)
         / np.sqrt(2 * np.pi)
-        * ZoutBayes_decorrelated_noise(
-            y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps, beta
-        )
-        * foutBayes_decorrelated_noise(
+        * DZoutBayes_decorrelated_noise(
             y, np.sqrt(eta) * xi, (1 - eta), delta_small, delta_large, eps, beta
         )
         * foutHuber(y, np.sqrt(q) * xi, sigma, a)

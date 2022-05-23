@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
 BLEND = 0.5
-TOL_FPE = 5e-9
+TOL_FPE = 5e-8
 
 
 def state_equations(
@@ -37,8 +37,8 @@ def state_equations(
         sigma = blend * sigma + (1 - blend) * temp_sigma
 
         # print(
-        #     "err: {:.7f} alpha : {:.2f} m : {:.7f} q : {:.7f} sigma : {:.7f}".format(
-        #         err, alpha, m, q, sigma
+        #     "     err: {:.10f} alpha : {:.2f} m : {:.7f} q : {:.7f} sigma : {:.7f} a : {:.7f} reg_par : {:.7f}".format(
+        #         err, alpha, m, q, sigma, var_hat_kwargs["a"], reg_param
         #     )
         # )
 
