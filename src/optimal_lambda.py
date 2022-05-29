@@ -159,9 +159,9 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
     obj = minimize(
         minimize_fun,
         x0=inital_values,
-        # method="Nelder-Mead",
+        method="Nelder-Mead",
         bounds=bnds,
-        # options={"xatol": XATOL, "fatol": FATOL, "adaptive": True,},
+        options={"xatol": XATOL, "fatol": FATOL, "adaptive": True,},
     )
     if obj.success:
         fun_val = obj.fun

@@ -291,7 +291,7 @@ def experimental_points_runner(**kwargs):
             kwargs["loss_name"],
             values=[
                 num.find_coefficients_L2,
-                -1,  # num.find_coefficients_L1,
+                num.find_coefficients_L1,
                 num.find_coefficients_Huber,
                 -1,
             ],
@@ -345,8 +345,8 @@ def theory_curve_runner(**kwargs):
 
         var_functions = [
             fpe.var_hat_func_L2_decorrelated_noise,
-            -1,
-            fpe.var_hat_func_Huber_num_decorrelated_noise,
+            fpe.var_hat_func_L1_decorrelated_noise,  # fpe.var_hat_func_L1_num_decorrelated_noise,
+            fpe.var_hat_func_Huber_decorrelated_noise,  # fpe.var_hat_func_Huber_num_decorrelated_noise,
             -1,
         ]
     else:
@@ -373,8 +373,8 @@ def theory_curve_runner(**kwargs):
 
             var_functions = [
                 fpe.var_hat_func_L2_double_noise,
-                -1,
-                fpe.var_hat_func_Huber_num_double_noise,
+                fpe.var_hat_func_L1_double_noise,  # fpe.var_hat_func_L1_num_double_noise,
+                fpe.var_hat_func_Huber_double_noise,  # fpe.var_hat_func_Huber_num_double_noise,
                 -1,
             ]
         else:
@@ -392,15 +392,15 @@ def theory_curve_runner(**kwargs):
 
             var_functions = [
                 fpe.var_hat_func_L2_single_noise,
-                -1,
-                fpe.var_hat_func_Huber_num_single_noise,
+                fpe.var_hat_func_L1_single_noise,  # fpe.var_hat_func_L1_num_single_noise,
+                fpe.var_hat_func_Huber_single_noise,  # fpe.var_hat_func_Huber_num_single_noise,
                 -1,
             ]
 
     if _loss_type_chose(kwargs["loss_name"], values=[False, False, True, False]):
         var_hat_kwargs.update({"a": kwargs["a"]})
 
-    alphas, [errors] = fpe.different_alpha_observables_fpeqs(
+    alphas, [errors] = fpe.no_parallel_different_alpha_observables_fpeqs(
         fpe.var_func_L2,
         _loss_type_chose(kwargs["loss_name"], values=var_functions),
         alpha_1=kwargs["alpha_min"],
@@ -526,7 +526,7 @@ def reg_param_optimal_runner(**kwargs):
 
         var_functions = [
             fpe.var_hat_func_L2_decorrelated_noise,
-            -1,
+            fpe.var_hat_func_L1_num_decorrelated_noise,
             fpe.var_hat_func_Huber_num_decorrelated_noise,
             -1,
         ]
@@ -554,7 +554,7 @@ def reg_param_optimal_runner(**kwargs):
 
             var_functions = [
                 fpe.var_hat_func_L2_double_noise,
-                -1,
+                fpe.var_hat_func_L1_num_double_noise,
                 fpe.var_hat_func_Huber_num_double_noise,
                 -1,
             ]
@@ -572,7 +572,7 @@ def reg_param_optimal_runner(**kwargs):
 
             var_functions = [
                 fpe.var_hat_func_L2_single_noise,
-                -1,
+                fpe.var_hat_func_L1_num_single_noise,
                 fpe.var_hat_func_Huber_num_single_noise,
                 -1,
             ]
@@ -614,6 +614,8 @@ def reg_param_optimal_experiment_runner(**kwargs):
         {"file_path": file_path,}
     )
     alphas_theoretical, _, lambdas_theoretical = load_file(**theoretical_exp_dict)
+    alphas_idx = alphas_theoretical <= 100
+    alphas_theoretical = alphas_theoretical[alphas_idx]
 
     alphas_experimental = np.append(
         alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
@@ -798,8 +800,10 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
     )
 
     alphas_theoretical, _, lambdas_theoretical, huber_params_theoretical = load_file(
-        theoretical_exp_dict
+        **theoretical_exp_dict
     )
+    alphas_idx = alphas_theoretical <= 100
+    alphas_theoretical = alphas_theoretical[alphas_idx]
 
     alphas_experimental = np.append(
         alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
@@ -845,7 +849,7 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
         alpha_1=kwargs["alpha_min"],
         alpha_2=kwargs["alpha_max"],
         n_features=kwargs["n_features"],
-        n_alpha_points=kwargs["alpha_pts"],
+        n_alpha_points=n_pts_experimental,
         repetitions=kwargs["repetitions"],
         reg_param=lambdas_experimental,
         measure_fun_kwargs=measure_fun_kwargs,

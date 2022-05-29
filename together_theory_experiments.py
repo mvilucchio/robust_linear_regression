@@ -19,25 +19,25 @@ if __name__ == "__main__":
     def get_cmap(n, name="hsv"):
         return plt.cm.get_cmap(name, n)
 
-    loss_name = "L2"
+    loss_name = "L1"
     delta_small, delta_large, percentage, beta = 0.1, 5.0, 0.1, 0.0
-    reg_params = [0.01, 0.1, 1.0, 10.0, 100.0]
+    reg_params = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 100.0]
 
     experimental_settings = [
         {
             "loss_name": loss_name,
             "alpha_min": 0.01,
             "alpha_max": 100,
-            "alpha_pts": 11,
+            "alpha_pts": 36,
             "reg_param": reg_param,
-            "repetitions": 10,
-            "n_features": 600,
+            "repetitions": 20,
+            "n_features": 1000,
             # "delta" : delta_large,
             "delta_small": delta_small,
             "delta_large": delta_large,
             "percentage": percentage,
             "beta": beta,
-            "a": 1.0,
+            # "a": 1.0,
             "experiment_type": "exp",
         }
         for reg_param in reg_params
@@ -46,15 +46,15 @@ if __name__ == "__main__":
     theory_settings = [
         {
             "loss_name": loss_name,
-            "alpha_min": 0.01,
-            "alpha_max": 100,
+            "alpha_min": 0.1,
+            "alpha_max": 100000,
             "alpha_pts": 100,
             "reg_param": reg_param,
             # "delta" : delta_large,
             "delta_small": delta_small,
             "delta_large": delta_large,
             "percentage": percentage,
-            "beta" : beta,
+            "beta": beta,
             "a": 1.0,
             "experiment_type": "theory",
         }
@@ -75,6 +75,8 @@ if __name__ == "__main__":
     ):
         file_exists, file_path = check_saved(**theory_dict)
 
+        print("file exists", file_exists)
+
         if not file_exists:
             experiment_runner(**theory_dict)
 
@@ -82,6 +84,7 @@ if __name__ == "__main__":
         alphas_theory[idx], errors_theory[idx] = load_file(**theory_dict)
 
         # file_exists, file_path = check_saved(**exp_dict)
+        # print("file exists", file_exists)
 
         # if not file_exists:
         #     experiment_runner(**exp_dict)
@@ -91,9 +94,9 @@ if __name__ == "__main__":
 
     # ------------
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
+    pu.initialization_mpl()
 
-    # pu.initialization_mpl()
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
 
     for idx, (al_n, err_m, err_s, al_t, err_t) in enumerate(
         zip(alphas_num, errors_mean_num, errors_std_num, alphas_theory, errors_theory)
@@ -102,30 +105,37 @@ if __name__ == "__main__":
         ax.plot(
             al_t,
             err_t,
-            linewidth=1,
+            # linewidth=1,
             # marker='.',
             label=r"$\lambda = {}$".format(reg_params[idx]),
-            # color=colormap(idx + 3),
+            color=colormap(idx + 3),
         )
 
         # ax.errorbar(
         #     al_n, err_m, err_s, marker=".", linestyle="None", color=colormap(idx + 3),
         # )
 
-    ax.set_title(
-        r"{} Loss - $\Delta = [{:.2f}, {:.2f}], \epsilon = {:.2f}$".format(
-            loss_name, delta_small, delta_large, percentage
-        )
+    # ax.set_title(
+    #     r"{} Loss - $\Delta = [{:.2f}, {:.2f}], \epsilon = {:.2f}$".format(
+    #         loss_name, delta_small, delta_large, percentage
+    #     )
+    # )
+    ax.set_ylabel(
+        r"Generalization Error: $\frac{1}{d} \mathbb{E}\qty[\norm{\bf{\hat{w}} - \bf{w^\star}}^2]$"
     )
-    ax.set_ylabel(r"$\frac{1}{d} E[||\hat{w} - w^\star||^2]$")
     ax.set_xlabel(r"$\alpha$")
     ax.set_xscale("log")
     ax.set_yscale("log")
     # ax.set_xlim([0.009, 110])
     ax.grid()
-    ax.legend()
+    ax.legend(prop={"size": 22})
 
     if save:
-        pu.save_plot(fig, "{}_theory_experiment_comparison_{}".format(loss_name, random_number))
+        pu.save_plot(
+            fig,
+            "{}_1.0_theory_experiment_comparison_decorrelated_ds_{}_dl_{}_eps_{}_beta_{}".format(
+                loss_name, delta_small, delta_large, percentage, beta
+            ),
+        )
 
     plt.show()

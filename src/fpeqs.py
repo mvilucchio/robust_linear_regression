@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit
+from math import erf, erfc
 import src.numerical_functions as numfun
 
 from multiprocessing import Pool
@@ -36,11 +37,11 @@ def state_equations(
         q = blend * q + (1 - blend) * temp_q
         sigma = blend * sigma + (1 - blend) * temp_sigma
 
-        # print(
-        #     "     err: {:.10f} alpha : {:.2f} m : {:.7f} q : {:.7f} sigma : {:.7f} a : {:.7f} reg_par : {:.7f}".format(
-        #         err, alpha, m, q, sigma, var_hat_kwargs["a"], reg_param
-        #     )
-        # )
+        print(
+            "err: {:.10f} alpha : {:.2f} m : {:.7f} q : {:.7f} sigma : {:.7f} reg_par : {:.7f}".format(
+                err, alpha, m, q, sigma, reg_param
+            )
+        )
 
     return m, q, sigma
 
@@ -380,11 +381,185 @@ def var_hat_func_L2_num_decorrelated_noise(
     return m_hat, q_hat, sigma_hat
 
 
+# -----------
+
+# @njit(error_model="numpy", fastmath=True)
+def var_hat_func_L1_single_noise(m, q, sigma, alpha, delta):
+    sqrt_arg = 1 + q + delta - 2 * m
+    erf_arg = sigma / np.sqrt(2 * sqrt_arg)
+
+    m_hat = (alpha / sigma) * erf(erf_arg)
+    q_hat = (alpha / sigma ** 2) * (
+        sqrt_arg * erf(erf_arg)
+        + sigma ** 2 * erfc(erf_arg)
+        - sigma * np.sqrt(2 / np.pi) * np.sqrt(sqrt_arg) * np.exp(-(erf_arg ** 2))
+    )
+    sigma_hat = (alpha / sigma) * erf(erf_arg)
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_L1_num_single_noise(m, q, sigma, alpha, delta):
+    m_hat = alpha * numfun.m_hat_equation_L1_single_noise(m, q, sigma, delta)
+    q_hat = alpha * numfun.q_hat_equation_L1_single_noise(m, q, sigma, delta)
+    sigma_hat = -alpha * numfun.sigma_hat_equation_L1_single_noise(m, q, sigma, delta)
+    return m_hat, q_hat, sigma_hat
+
+
+# @njit(error_model="numpy", fastmath=True)
+def var_hat_func_L1_double_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage
+):
+    small_sqrt = delta_small - 2 * m + q + 1  # + 1e-9
+    large_sqrt = delta_large - 2 * m + q + 1  # + 1e-9
+    small_erf = sigma / np.sqrt(2 * small_sqrt)
+    large_erf = sigma / np.sqrt(2 * large_sqrt)
+
+    print(
+        "small_sqrt {:.5f} large_sqrt {:.5f} small_erf {:.5f} large_erf {:.5f}".format(
+            small_sqrt, large_sqrt, small_erf, large_erf
+        )
+    )
+
+    m_hat = (alpha / sigma) * (
+        (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
+    )
+    q_hat = (alpha / sigma ** 2) * (
+        sigma ** 2
+        + (
+            (1 - percentage) * (small_sqrt - sigma ** 2) * erf(small_erf)
+            + percentage * (large_erf - sigma ** 2) * erf(large_erf)
+        )
+        - np.sqrt(2 / np.pi)
+        * sigma
+        * (
+            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
+            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+        )
+    )
+    sigma_hat = (alpha / sigma) * (
+        (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
+    )
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_L1_num_double_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage
+):
+    m_hat = alpha * numfun.m_hat_equation_L1_double_noise(
+        m, q, sigma, delta_small, delta_large, percentage
+    )
+    q_hat = alpha * numfun.q_hat_equation_L1_double_noise(
+        m, q, sigma, delta_small, delta_large, percentage
+    )
+    sigma_hat = -alpha * numfun.sigma_hat_equation_L1_double_noise(
+        m, q, sigma, delta_small, delta_large, percentage
+    )
+    return m_hat, q_hat, sigma_hat
+
+
+# @njit(error_model="numpy", fastmath=True)
+def var_hat_func_L1_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta
+):
+    small_sqrt = delta_small - 2 * m + q + 1
+    large_sqrt = delta_large - 2 * m * beta + q + beta ** 2
+    small_erf = sigma / np.sqrt(2 * small_sqrt)
+    large_erf = sigma / np.sqrt(2 * large_sqrt)
+
+    m_hat = (alpha / sigma) * (
+        (1 - percentage) * erf(small_erf) + beta * percentage * erf(large_erf)
+    )
+    q_hat = alpha * (
+        (
+            (1 - percentage)
+            * (small_sqrt * erf(small_erf) + sigma ** 2 * erfc(small_erf))
+            + percentage * (large_erf * erf(large_erf) + sigma ** 2 * erfc(large_erf))
+        )
+        / sigma ** 2
+        - np.sqrt(2 / np.pi)
+        * (
+            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
+            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+        )
+    )
+    sigma_hat = (alpha / sigma) * (
+        (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
+    )
+    return m_hat, q_hat, sigma_hat
+
+
+def var_hat_func_L1_num_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta
+):
+    m_hat = alpha * numfun.m_hat_equation_L1_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta
+    )
+    q_hat = alpha * numfun.q_hat_equation_L1_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta
+    )
+    sigma_hat = -alpha * numfun.sigma_hat_equation_L1_decorrelated_noise(
+        m, q, sigma, delta_small, delta_large, percentage, beta
+    )
+    return m_hat, q_hat, sigma_hat
+
+
+# -----------
+
+# @njit(error_model="numpy", fastmath=True)
+def var_hat_func_Huber_single_noise(m, q, sigma, alpha, delta, a):
+    arg_sqrt = 1 + q + delta - 2 * m
+    erf_arg = (a * (sigma + 1)) / np.sqrt(2 * arg_sqrt)
+
+    m_hat = (alpha / (1 + sigma)) * erf(erf_arg)
+    q_hat = (alpha / (1 + sigma) ** 2) * (
+        arg_sqrt * erf(erf_arg)
+        + a ** 2 * (1 + sigma) ** 2 * erfc(erf_arg)
+        - a
+        * (1 + sigma)
+        * np.sqrt(2 / np.pi)
+        * np.sqrt(arg_sqrt)
+        * np.exp(-(erf_arg ** 2))
+    )
+    sigma_hat = (alpha / (1 + sigma)) * erf(erf_arg)
+    return m_hat, q_hat, sigma_hat
+
+
 def var_hat_func_Huber_num_single_noise(m, q, sigma, alpha, delta, a):
     m_hat = alpha * numfun.m_hat_equation_Huber_single_noise(m, q, sigma, delta, a)
     q_hat = alpha * numfun.q_hat_equation_Huber_single_noise(m, q, sigma, delta, a)
     sigma_hat = -alpha * numfun.sigma_hat_equation_Huber_single_noise(
         m, q, sigma, delta, a
+    )
+    return m_hat, q_hat, sigma_hat
+
+
+# @njit(error_model="numpy", fastmath=True)
+def var_hat_func_Huber_double_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, a
+):
+    small_sqrt = delta_small - 2 * m + q + 1
+    large_sqrt = delta_large - 2 * m + q + 1
+    small_erf = (a * (sigma + 1)) / np.sqrt(2 * small_sqrt)
+    large_erf = (a * (sigma + 1)) / np.sqrt(2 * large_sqrt)
+
+    m_hat = (alpha / (1 + sigma)) * (
+        (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
+    )
+    q_hat = alpha * (
+        a ** 2
+        - (np.sqrt(2 / np.pi) * a / (1 + sigma))
+        * (
+            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
+            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+        )
+        + (1 / (1 + sigma) ** 2)
+        * (
+            (1 - percentage) * (small_sqrt - (a * (1 + sigma)) ** 2) * erf(small_erf)
+            + percentage * (large_sqrt - (a * (1 + sigma)) ** 2) * erf(large_erf)
+        )
+    )
+    sigma_hat = (alpha / (1 + sigma)) * (
+        (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
     )
     return m_hat, q_hat, sigma_hat
 
@@ -404,6 +579,37 @@ def var_hat_func_Huber_num_double_noise(
     return m_hat, q_hat, sigma_hat
 
 
+# @njit(error_model="numpy", fastmath=True)
+def var_hat_func_Huber_decorrelated_noise(
+    m, q, sigma, alpha, delta_small, delta_large, percentage, beta, a
+):
+    small_sqrt = delta_small - 2 * m + q + 1
+    large_sqrt = delta_large - 2 * m * beta + q + beta ** 2
+    small_erf = (a * (sigma + 1)) / np.sqrt(2 * small_sqrt)
+    large_erf = (a * (sigma + 1)) / np.sqrt(2 * large_sqrt)
+
+    m_hat = (alpha / (1 + sigma)) * (
+        (1 - percentage) * erf(small_erf) + beta * percentage * erf(large_erf)
+    )
+    q_hat = alpha * (
+        a ** 2
+        - (np.sqrt(2 / np.pi) * a / (1 + sigma))
+        * (
+            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
+            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+        )
+        + (1 / (1 + sigma) ** 2)
+        * (
+            (1 - percentage) * (small_sqrt - (a * (1 + sigma)) ** 2) * erf(small_erf)
+            + percentage * (large_sqrt - (a * (1 + sigma)) ** 2) * erf(large_erf)
+        )
+    )
+    sigma_hat = (alpha / (1 + sigma)) * (
+        (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
+    )
+    return m_hat, q_hat, sigma_hat
+
+
 def var_hat_func_Huber_num_decorrelated_noise(
     m, q, sigma, alpha, delta_small, delta_large, percentage, beta, a
 ):
@@ -417,6 +623,9 @@ def var_hat_func_Huber_num_decorrelated_noise(
         m, q, sigma, delta_small, delta_large, percentage, beta, a,
     )
     return m_hat, q_hat, sigma_hat
+
+
+# -----------
 
 
 def var_hat_func_numerical_loss_single_noise(
