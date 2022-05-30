@@ -5,7 +5,7 @@ if __name__ == "__main__":
 
     deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]  # 0.5, 1.0, 2.0, 5.0, 10.0
     percentages = [0.3, 0.1]  # 0.01, 0.05, 0.1, 0.3
-    betas = [0.0, 0.5]  # , 0.5
+    betas = [0.0, 0.5, 1.0]  # , 0.5
     loss_name = "Huber"
 
     experiment_settings = [

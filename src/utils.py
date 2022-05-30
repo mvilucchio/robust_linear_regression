@@ -526,8 +526,8 @@ def reg_param_optimal_runner(**kwargs):
 
         var_functions = [
             fpe.var_hat_func_L2_decorrelated_noise,
-            fpe.var_hat_func_L1_num_decorrelated_noise,
-            fpe.var_hat_func_Huber_num_decorrelated_noise,
+            fpe.var_hat_func_L1_decorrelated_noise,
+            fpe.var_hat_func_Huber_decorrelated_noise,
             -1,
         ]
     else:
@@ -554,8 +554,8 @@ def reg_param_optimal_runner(**kwargs):
 
             var_functions = [
                 fpe.var_hat_func_L2_double_noise,
-                fpe.var_hat_func_L1_num_double_noise,
-                fpe.var_hat_func_Huber_num_double_noise,
+                fpe.var_hat_func_L1_double_noise,
+                fpe.var_hat_func_Huber_double_noise,
                 -1,
             ]
         else:
@@ -572,8 +572,8 @@ def reg_param_optimal_runner(**kwargs):
 
             var_functions = [
                 fpe.var_hat_func_L2_single_noise,
-                fpe.var_hat_func_L1_num_single_noise,
-                fpe.var_hat_func_Huber_num_single_noise,
+                fpe.var_hat_func_L1_single_noise,
+                fpe.var_hat_func_Huber_single_noise,
                 -1,
             ]
 
@@ -719,7 +719,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                 initial_condition = [m, q, sigma]
                 break
 
-        var_hat_func = fpe.var_hat_func_Huber_num_decorrelated_noise
+        var_hat_func = fpe.var_hat_func_Huber_decorrelated_noise
     else:
         if double_noise:
             var_hat_kwargs = {
@@ -742,7 +742,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                     initial_condition = [m, q, sigma]
                     break
 
-            var_hat_func = fpe.var_hat_func_Huber_num_double_noise
+            var_hat_func = fpe.var_hat_func_Huber_double_noise
         else:
             var_hat_kwargs = {"delta": kwargs["delta"]}
             delta = kwargs["delta"]
@@ -755,7 +755,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                     initial_condition = [m, q, sigma]
                     break
 
-            var_hat_func = fpe.var_hat_func_Huber_num_single_noise
+            var_hat_func = fpe.var_hat_func_Huber_single_noise
 
     (alphas, errors, lambdas, huber_params,) = optimal_reg_param_and_huber_parameter(
         var_hat_func=var_hat_func,
