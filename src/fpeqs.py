@@ -1,8 +1,8 @@
 import numpy as np
 from numba import njit
-from math import erf, erfc
+from math import erfc  # , erf
 import src.numerical_functions as numfun
-
+from scipy.special import log_ndtr, erf
 from multiprocessing import Pool
 from tqdm.auto import tqdm
 
@@ -37,11 +37,11 @@ def state_equations(
         q = blend * q + (1 - blend) * temp_q
         sigma = blend * sigma + (1 - blend) * temp_sigma
 
-        print(
-            "err: {:.10f} alpha : {:.2f} m : {:.7f} q : {:.7f} sigma : {:.7f} reg_par : {:.7f}".format(
-                err, alpha, m, q, sigma, reg_param
-            )
-        )
+        # print(
+        #     "  err: {:.8f} alpha : {:.2f} m = {:.9f}; q = {:.9f}; \[CapitalSigma] = {:.9f}; reg_par : {:.7f}".format(
+        #         err, alpha, m, q, sigma, reg_param
+        #     )
+        # )
 
     return m, q, sigma
 
@@ -292,12 +292,12 @@ def var_hat_func_BO_num_decorrelated_noise(
 # --------------------------
 
 
-@njit(error_model="numpy", fastmath=True)
+# @njit(error_model="numpy", fastmath=True)
 def var_func_L2(
     m_hat, q_hat, sigma_hat, reg_param,
 ):
     m = m_hat / (sigma_hat + reg_param)
-    q = (np.square(m_hat) + q_hat) / np.square(sigma_hat + reg_param)
+    q = (m_hat ** 2 + q_hat) / (sigma_hat + reg_param) ** 2
     sigma = 1.0 / (sigma_hat + reg_param)
     return m, q, sigma
 
@@ -409,31 +409,32 @@ def var_hat_func_L1_num_single_noise(m, q, sigma, alpha, delta):
 def var_hat_func_L1_double_noise(
     m, q, sigma, alpha, delta_small, delta_large, percentage
 ):
-    small_sqrt = delta_small - 2 * m + q + 1  # + 1e-9
-    large_sqrt = delta_large - 2 * m + q + 1  # + 1e-9
+    small_sqrt = delta_small - 2 * m + q + 1
+    large_sqrt = delta_large - 2 * m + q + 1
+    small_exp = -(sigma ** 2) / (2 * small_sqrt)
+    large_exp = -(sigma ** 2) / (2 * large_sqrt)
     small_erf = sigma / np.sqrt(2 * small_sqrt)
     large_erf = sigma / np.sqrt(2 * large_sqrt)
-
-    print(
-        "small_sqrt {:.5f} large_sqrt {:.5f} small_erf {:.5f} large_erf {:.5f}".format(
-            small_sqrt, large_sqrt, small_erf, large_erf
-        )
-    )
 
     m_hat = (alpha / sigma) * (
         (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
     )
-    q_hat = (alpha / sigma ** 2) * (
-        sigma ** 2
-        + (
-            (1 - percentage) * (small_sqrt - sigma ** 2) * erf(small_erf)
-            + percentage * (large_erf - sigma ** 2) * erf(large_erf)
+    q_hat = alpha * (
+        (1 - percentage) * erfc(small_erf) + percentage * erfc(large_erf)
+    ) + alpha / sigma ** 2 * (
+        (
+            (1 - percentage) * (small_sqrt) * erf(small_erf)
+            + percentage * (large_sqrt) * erf(large_erf)
         )
-        - np.sqrt(2 / np.pi)
-        * sigma
-        * (
-            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
-            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+        - np.exp(
+            np.log(sigma)
+            + 0.5 * np.log(2)
+            - 0.5 * np.log(np.pi)
+            + 0.5 * np.log(large_sqrt)
+            + np.log(
+                (1 - percentage) * np.sqrt(small_sqrt / large_sqrt) * np.exp(small_exp)
+                + percentage * np.exp(large_exp)
+            )
         )
     )
     sigma_hat = (alpha / sigma) * (

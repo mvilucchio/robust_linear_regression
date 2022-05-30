@@ -246,7 +246,7 @@ def find_coefficients_L1(ys, xs, reg_param):
     w = cp.Variable(shape=d)
     obj = cp.Minimize(cp.norm(ys - xs_norm @ w, 1) + 0.5 * reg_param * cp.sum_squares(w))
     prob = cp.Problem(obj)
-    prob.solve()
+    prob.solve(eps_abs=1e-3)
 
     return w.value
 
