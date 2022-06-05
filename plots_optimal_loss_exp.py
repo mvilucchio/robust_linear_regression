@@ -15,10 +15,13 @@ from src.utils import load_file
 
 
 @vectorize
-def integrate_fun(z, V, omega, beta, delta_large):
-    return np.exp(-(z ** 2) / 2) * np.exp(
-        -np.abs(-beta * np.sqrt(V) * z - beta * omega) / delta_large
-    )
+def integrate_fun(z, V, omega, beta, delta_large, a, alpha):
+    if :
+        return np.exp(-(z ** 2) / 2) * 
+    elif :
+        return np.exp(-(z ** 2) / 2) * 
+    else:
+        return np.exp(-(z ** 2) / 2) * np.exp()
 
 
 # @vectorize
@@ -31,32 +34,25 @@ def integrate_fun(z, V, omega, beta, delta_large):
 #         return np.exp(-(z ** 2) / 2) * np.exp(-np.abs(-np.sqrt(V) * z - omega) / 2)
 
 
-# def minimize_fun(omega, x, V, eps, delta_small, delta_large, beta):
-#     return (
-#         (x - omega) ** 2 / (2 * V)
-#         - ((-beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
-#         + np.log(
-#             (1 - eps)
-#             * np.exp(
-#                 -((-omega) ** 2) / (2 * (V + delta_small))
-#                 + ((-beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
-#             )
-#             / np.sqrt(2 * np.pi * (V + delta_small))
-#             + eps / np.sqrt(2 * np.pi * (beta ** 2 * V + delta_large))
-#         )
-#     )
-
-
 def minimize_fun(omega, x, V, eps, delta_small, delta_large, beta):
-    return (x - omega) ** 2 / (2 * V) + np.log(
-        (1 - eps)
-        * np.exp(
-            -((-omega) ** 2) / (2 * (V + delta_small))
-            + ((-beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
+    return (
+        (x - omega) ** 2 / (2 * V)
+        + np.log(
+            quad(integrate_fun, -100, 100, args=(V, omega, beta, delta_large))
         )
-        / np.sqrt(2 * np.pi * (V + delta_small))
-        + eps / np.sqrt(2 * np.pi * (beta ** 2 * V + delta_large))
     )
+
+
+# def minimize_fun(omega, x, V, eps, delta_small, delta_large, beta):
+#     return (x - omega) ** 2 / (2 * V) + np.log(
+#         (1 - eps)
+#         * np.exp(
+#             -((-omega) ** 2) / (2 * (V + delta_small))
+#             + ((-beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
+#         )
+#         / np.sqrt(2 * np.pi * (V + delta_small))
+#         + eps / np.sqrt(2 * np.pi * (beta ** 2 * V + delta_large))
+#     )
 
 
 def _minimize_my(x, V, eps, delta_small, delta_large, beta):
@@ -104,7 +100,7 @@ if __name__ == "__main__":
 
         for a, V in zip(alphas, Vs):
 
-            xs = np.logspace(0, 3, 300)
+            xs = np.linspace(-30, 30, 300)
             loss_values = np.empty_like(xs)
 
             inputs = [(x, V, eps, delta_small, dl, beta) for x in xs]

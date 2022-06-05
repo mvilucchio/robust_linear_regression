@@ -11,10 +11,10 @@ if __name__ == "__main__":
     def get_cmap(n, name="hsv"):
         return plt.cm.get_cmap(name, n)
 
-    loss_name = "L1"
+    loss_name = "Huber"
     delta_small, delta_large, percentage, beta = 0.1, 10.0, 0.3, 0.0
-    reg_params = [0.0001, 0.001]
-    # 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0
+    reg_params = [1e-5]
+    # 1e-7, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0
 
     experimental_settings = [
         {
@@ -29,8 +29,8 @@ if __name__ == "__main__":
             "delta_small": delta_small,
             "delta_large": delta_large,
             "percentage": percentage,
-            # "beta": beta,
-            # "a": 1.0,
+            "beta": beta,
+            "a": 1.0,
             "experiment_type": "exp",
         }
         for reg_param in reg_params
@@ -40,15 +40,15 @@ if __name__ == "__main__":
         {
             "loss_name": loss_name,
             "alpha_min": 0.01,
-            "alpha_max": 100,
-            "alpha_pts": 100,
+            "alpha_max": 10000,
+            "alpha_pts": 1000,
             "reg_param": reg_param,
             #  "delta": delta_large,
             "delta_small": delta_small,
             "delta_large": delta_large,
             "percentage": percentage,
-            # "beta": beta,
-            # "a": 0.5,
+            "beta": beta,
+            "a": 1.0,
             "experiment_type": "theory",
         }
         for reg_param in reg_params

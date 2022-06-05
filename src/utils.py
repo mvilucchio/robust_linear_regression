@@ -10,6 +10,11 @@ from src.optimal_lambda import (
 )
 
 
+def _get_spaced_index(array, num_elems, max_val=100):
+    cond_array = array <= max_val
+    return np.round(np.linspace(0, len(cond_array) - 1, num_elems)).astype(int)
+
+
 DATA_FOLDER_PATH = "./data"  # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  #
 
 FOLDER_PATHS = [
@@ -608,23 +613,29 @@ def reg_param_optimal_experiment_runner(**kwargs):
     file_exists, file_path = check_saved(**theoretical_exp_dict)
 
     if not file_exists:
-        raise RuntimeError("The file corresponding to the experiment do not exists")
+        raise RuntimeError("The file corresponding to the experiment do not exists.")
 
     theoretical_exp_dict.update(
         {"file_path": file_path,}
     )
     alphas_theoretical, _, lambdas_theoretical = load_file(**theoretical_exp_dict)
-    alphas_idx = alphas_theoretical <= 100
-    alphas_theoretical = alphas_theoretical[alphas_idx]
 
-    alphas_experimental = np.append(
-        alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
-        alphas_theoretical[-1],
-    )
-    lambdas_experimental = np.append(
-        lambdas_theoretical[:: n_pts_theoretical // n_pts_experimental],
-        lambdas_theoretical[-1],
-    )
+    idxs = _get_spaced_index(alphas_theoretical, n_pts_experimental)
+
+    alphas_experimental = alphas_theoretical[idxs]
+    lambdas_experimental = lambdas_theoretical[idxs]
+
+    # alphas_idx = alphas_theoretical <= 100
+    # alphas_theoretical = alphas_theoretical[alphas_idx]
+
+    # alphas_experimental = np.append(
+    #     alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
+    #     alphas_theoretical[-1],
+    # )
+    # lambdas_experimental = np.append(
+    #     lambdas_theoretical[:: n_pts_theoretical // n_pts_experimental],
+    #     lambdas_theoretical[-1],
+    # )
 
     double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
     decorrelated_noise = not (kwargs.get("beta", 1.0) == 1.0)
@@ -660,7 +671,7 @@ def reg_param_optimal_experiment_runner(**kwargs):
             kwargs["loss_name"],
             values=[
                 num.find_coefficients_L2,
-                -1,  # num.find_coefficients_L1,
+                num.find_coefficients_L1,
                 num.find_coefficients_Huber,
                 -1,
             ],
@@ -793,7 +804,7 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
     file_exists, file_path = check_saved(**theoretical_exp_dict)
 
     if not file_exists:
-        raise RuntimeError("The file corresponding to the experiment do not exists")
+        raise RuntimeError("The file corresponding to the experiment do not exists.")
 
     theoretical_exp_dict.update(
         {"file_path": file_path,}
@@ -802,21 +813,15 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
     alphas_theoretical, _, lambdas_theoretical, huber_params_theoretical = load_file(
         **theoretical_exp_dict
     )
-    alphas_idx = alphas_theoretical <= 100
-    alphas_theoretical = alphas_theoretical[alphas_idx]
 
-    alphas_experimental = np.append(
-        alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
-        alphas_theoretical[-1],
+    idxs_experimental = np.arange(np.sum(alphas_theoretical <= 100)) % (
+        n_pts_theoretical // n_pts_experimental
     )
-    lambdas_experimental = np.append(
-        lambdas_theoretical[:: n_pts_theoretical // n_pts_experimental],
-        lambdas_theoretical[-1],
-    )
-    huber_params_experimental = np.append(
-        huber_params_theoretical[:: n_pts_theoretical // n_pts_experimental],
-        huber_params_theoretical[-1],
-    )
+    idxs_experimental[-1] = True
+
+    alphas_experimental = alphas_theoretical[idxs_experimental]
+    lambdas_experimental = lambdas_theoretical[idxs_experimental]
+    huber_params_experimental = huber_params_theoretical[idxs_experimental]
 
     double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
     decorrelated_noise = not (kwargs.get("beta", 1.0) == 1.0)

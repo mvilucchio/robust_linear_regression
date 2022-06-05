@@ -152,6 +152,8 @@ def generate_different_alpha(
         alphas = np.logspace(
             np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
         )
+    else:
+        n_alpha_points = len(alphas)
 
     if isinstance(reg_param, Number):
         reg_param = reg_param * np.ones_like(alphas)
@@ -179,6 +181,7 @@ def generate_different_alpha(
     with Pool() as pool:
         results = pool.starmap(_find_numerical_mean_std, inputs)
 
+    print("---", len(results))
     for idx, r in enumerate(results):
         errors_mean[idx] = r[0]
         errors_std[idx] = r[1]

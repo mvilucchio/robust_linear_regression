@@ -9,8 +9,8 @@ from tqdm.auto import tqdm
 # from mpi4py import MPI
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-BLEND = 0.5
-TOL_FPE = 5e-8
+BLEND = 0.55
+TOL_FPE = 1e-9
 
 
 def state_equations(
@@ -464,6 +464,8 @@ def var_hat_func_L1_decorrelated_noise(
 ):
     small_sqrt = delta_small - 2 * m + q + 1
     large_sqrt = delta_large - 2 * m * beta + q + beta ** 2
+    small_exp = -(sigma ** 2) / (2 * small_sqrt)
+    large_exp = -(sigma ** 2) / (2 * large_sqrt)
     small_erf = sigma / np.sqrt(2 * small_sqrt)
     large_erf = sigma / np.sqrt(2 * large_sqrt)
 
@@ -471,16 +473,20 @@ def var_hat_func_L1_decorrelated_noise(
         (1 - percentage) * erf(small_erf) + beta * percentage * erf(large_erf)
     )
     q_hat = alpha * (
+        (1 - percentage) * erfc(small_erf) + percentage * erfc(large_erf)
+    ) + alpha / sigma ** 2 * (
         (
-            (1 - percentage)
-            * (small_sqrt * erf(small_erf) + sigma ** 2 * erfc(small_erf))
-            + percentage * (large_erf * erf(large_erf) + sigma ** 2 * erfc(large_erf))
+            (1 - percentage) * (small_sqrt) * erf(small_erf)
+            + percentage * (large_sqrt) * erf(large_erf)
         )
-        / sigma ** 2
-        - np.sqrt(2 / np.pi)
-        * (
-            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
-            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+        - np.exp(
+            np.log(sigma)
+            + 0.5 * np.log(2)
+            - 0.5 * np.log(np.pi)
+            + np.log(
+                (1 - percentage) * np.sqrt(small_sqrt) * np.exp(small_exp)
+                + percentage * np.sqrt(large_sqrt) * np.exp(large_exp)
+            )
         )
     )
     sigma_hat = (alpha / sigma) * (
