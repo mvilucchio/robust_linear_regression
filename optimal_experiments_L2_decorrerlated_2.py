@@ -1,27 +1,30 @@
 from src.utils import experiment_runner
-from itertools import product
 
 if __name__ == "__main__":
+    percentage, delta_small, delta_large = 0.3, 0.1, 5.0
 
-    deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]  # 0.5, 1.0, 2.0, 5.0, 10.0
-    percentages = [0.3, 0.1]  # 0.01, 0.05, 0.1, 0.3
-    betas = [0.0, 0.5]
-    loss_name = "L2"
+    deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]
+    betas = [0.0]
+    b = betas[0]
 
-    experiment_settings = [
+    experiments_settings = [
         {
-            "loss_name": loss_name,
+            "loss_name": "L2",
             "alpha_min": 0.01,
-            "alpha_max": 1000,
-            "alpha_pts": 46,
-            "percentage": p,
-            "delta_small": 0.1,
+            "alpha_max": 10000,
+            "alpha_pts_theoretical": 150,
+            "alpha_pts_experimental": 21,
+            "delta_small": delta_small,
             "delta_large": dl,
+            "percentage": percentage,
+            "n_features": 1000,
+            "repetitions": 10,
             "beta": b,
-            "experiment_type": "reg_param optimal",
+            "experiment_type": "reg_param optimal exp",
         }
-        for b, dl, p in product(betas, deltas_large, percentages)
+        for dl in deltas_large  # reg_params
     ]
 
-    for dic in experiment_settings:
-        experiment_runner(**dic)
+    for exp_dict in experiments_settings:
+        experiment_runner(**exp_dict)
+

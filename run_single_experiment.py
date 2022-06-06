@@ -1,13 +1,7 @@
-from tqdm import tqdm
 from src.utils import experiment_runner
-import sys
-from itertools import product
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        percentage, delta_small, delta_large = 0.3, 0.1, 5.0
-    else:
-        percentage, delta_small, delta_large = map(float, sys.argv[1:])
+    percentage, delta_small, delta_large = 0.3, 0.1, 5.0
 
     # reg_params = [0.01, 0.1, 1.0, 10.0, 100.0]
     deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]  # 0.5, 1.0, 2.0, 5.0, 10.0

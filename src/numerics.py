@@ -8,7 +8,7 @@ from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-import cvxpy as cp
+# import cvxpy as cp
 
 
 def measure_gen_single(generalization, teacher_vector, xs, delta=1):

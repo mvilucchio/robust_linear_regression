@@ -1,28 +1,29 @@
 from src.utils import experiment_runner
-from itertools import product
-from tqdm.auto import tqdm
 
 if __name__ == "__main__":
+    percentage, delta_small, delta_large = 0.3, 0.1, 5.0
 
-    deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]  # 0.5, 1.0, 2.0, 5.0, 10.0
-    percentages = [0.3, 0.1]  # 0.01, 0.05, 0.1, 0.3
-    betas = [0.5]  # , 0.5, 1.0
-    loss_name = "L1"
+    deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]
+    betas = [0.0]
+    b = betas[0]
 
-    experiment_settings = [
+    experiments_settings = [
         {
-            "loss_name": loss_name,
+            "loss_name": "Huber",
             "alpha_min": 0.01,
             "alpha_max": 10000,
-            "alpha_pts": 200,
-            "percentage": p,
-            "delta_small": 0.1,
+            "alpha_pts_theoretical": 150,
+            "alpha_pts_experimental": 21,
+            "delta_small": delta_small,
             "delta_large": dl,
-            # "beta": b,
-            "experiment_type": "reg_param optimal",
+            "percentage": percentage,
+            "n_features": 1000,
+            "repetitions": 10,
+            "beta": b,
+            "experiment_type": "reg_param huber_param optimal exp",
         }
-        for b, dl, p in product(betas, deltas_large, percentages)
+        for dl in deltas_large  # reg_params
     ]
 
-    for dic in tqdm(experiment_settings):
-        experiment_runner(**dic)
+    for exp_dict in experiments_settings:
+        experiment_runner(**exp_dict)

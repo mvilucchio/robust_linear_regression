@@ -3,16 +3,16 @@
 #SBATCH --nodes 1
 #SBATCH --tasks-per-node 36
 #SBATCH --mem 120G
-#SBATCH --time 20:00:00
+#SBATCH --time 24:00:00
 #SBATCH -o robust_linear_regression/output1Huber.out
 #SBATCH -e robust_linear_regression/error1Huber.out
 #SBATCH --partition=parallel
 
 module load gcc
 module load mvapich2
-module load python/3.7.7
+module load python
 
-source venv/troiani/bin/activate
+source venv/updated-venv/bin/activate
 
 cd robust_linear_regression
 

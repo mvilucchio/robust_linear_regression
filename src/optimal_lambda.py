@@ -8,8 +8,8 @@ from multiprocessing import Pool
 SMALLEST_REG_PARAM = 1e-7
 SMALLEST_HUBER_PARAM = 1e-7
 MAX_ITER = 2500
-XATOL = 1e-7
-FATOL = 1e-7
+XATOL = 1e-4
+FATOL = 1e-4
 
 
 def _find_optimal_reg_param_gen_error(
