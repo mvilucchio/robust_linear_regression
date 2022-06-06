@@ -11,7 +11,7 @@ if __name__ == "__main__":
         {
             "loss_name": "L2",
             "alpha_min": 0.01,
-            "alpha_max": 10000,
+            "alpha_max": 1000,
             "alpha_pts": 150,
             "delta_small": delta_small,
             "delta_large": dl,
