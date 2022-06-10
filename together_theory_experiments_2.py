@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
     loss_name = "Huber"
     delta_small, delta_large, percentage, beta = 0.1, 10.0, 0.3, 0.0
-    reg_params = [1e-5]
+    reg_params = [1e-6]
     # 1e-7, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0
 
     experimental_settings = [

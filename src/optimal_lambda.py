@@ -5,11 +5,11 @@ from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-SMALLEST_REG_PARAM = 1e-7
-SMALLEST_HUBER_PARAM = 1e-7
+SMALLEST_REG_PARAM = 1e-4
+SMALLEST_HUBER_PARAM = 1e-4
 MAX_ITER = 2500
-XATOL = 1e-4
-FATOL = 1e-4
+XATOL = 1e-5
+FATOL = 1e-5
 
 
 def _find_optimal_reg_param_gen_error(
@@ -96,7 +96,7 @@ def _find_optimal_huber_parameter_gen_error(
     obj = minimize(
         error_func,
         x0=inital_value,
-        method="Nelder-Mead",
+        # method="Nelder-Mead",
         bounds=bnds,
         options={"xatol": XATOL, "fatol": FATOL},
     )  # ,

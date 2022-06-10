@@ -1,4 +1,5 @@
 from src.utils import experiment_runner
+from tqdm.auto import tqdm
 
 if __name__ == "__main__":
     percentage, delta_small, delta_large = 0.3, 0.1, 5.0
@@ -25,6 +26,6 @@ if __name__ == "__main__":
         for dl in deltas_large  # reg_params
     ]
 
-    for exp_dict in experiments_settings:
+    for exp_dict in tqdm(experiments_settings):
         experiment_runner(**exp_dict)
 

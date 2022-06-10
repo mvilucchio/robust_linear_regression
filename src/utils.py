@@ -15,7 +15,7 @@ def _get_spaced_index(array, num_elems, max_val=100):
     return np.round(np.linspace(0, len(cond_array) - 1, num_elems)).astype(int)
 
 
-DATA_FOLDER_PATH = "./data"  # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  #
+DATA_FOLDER_PATH = "/Users/matteovilucchio/Documents/ENS/HProblem/robust_linear_regression/data"  # "./data"  # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  #
 
 FOLDER_PATHS = [
     "./data/experiments",
@@ -47,9 +47,9 @@ SINGLE_NOISE_NAMES = [
     "{loss_name} single noise - theory - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta {delta} - lambda {reg_param}",
     "BO single noise - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta {delta}",
     "{loss_name} single noise - reg_param optimal - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta {delta}",
-    "{loss_name} single noise - reg_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta {delta}",
+    "{loss_name} single noise - reg_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts_experimental:d}] - delta {delta}",
     "Huber single noise - reg_param and huber_param optimal - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta {delta}",
-    "Huber single noise - reg_param and huber_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta {delta}",
+    "Huber single noise - reg_param and huber_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts_experimental:d}] - delta {delta}",
     "{loss_name} single noise - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta {delta} - lambda {reg_param}",
 ]
 
@@ -58,9 +58,9 @@ DOUBLE_NOISE_NAMES = [
     "{loss_name} double noise - eps {percentage} - theory - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}] - lambda {reg_param}",
     "BO double noise - eps {percentage} - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
     "{loss_name} double noise - eps {percentage} - reg_param optimal - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
-    "{loss_name} double noise - eps {percentage} - reg_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
+    "{loss_name} double noise - eps {percentage} - reg_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts_experimental:d}] - delta [{delta_small} {delta_large}]",
     "Huber double noise - eps {percentage} - reg_param and huber_param optimal - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
-    "Huber double noise - eps {percentage} - reg_param and huber_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
+    "Huber double noise - eps {percentage} - reg_param and huber_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts_experimental:d}] - delta [{delta_small} {delta_large}]",
     "{loss_name} double noise - eps {percentage} - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}] - lambda {reg_param}",
 ]
 
@@ -69,9 +69,9 @@ DECORRELATED_NOISE_NAMES = [
     "{loss_name} decorrelated noise {beta} - eps {percentage} - theory - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}] - lambda {reg_param}",
     "BO decorrelated noise {beta} - eps {percentage} - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
     "{loss_name} decorrelated noise {beta} - eps {percentage} - reg_param optimal - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
-    "{loss_name} decorrelated noise {beta} - eps {percentage} - reg_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
+    "{loss_name} decorrelated noise {beta} - eps {percentage} - reg_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts_experimental:d}] - delta [{delta_small} {delta_large}]",
     "Huber decorrelated noise {beta} - eps {percentage} - reg_param and huber_param optimal - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
-    "Huber decorrelated noise {beta} - eps {percentage} - reg_param and huber_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}]",
+    "Huber decorrelated noise {beta} - eps {percentage} - reg_param and huber_param optimal experimental - alphas [{alpha_min} {alpha_max} {alpha_pts_experimental:d}] - delta [{delta_small} {delta_large}]",
     "{loss_name} decorrelated noise {beta} - eps {percentage} - alphas [{alpha_min} {alpha_max} {alpha_pts:d}] - delta [{delta_small} {delta_large}] - lambda {reg_param}",
 ]
 
@@ -768,7 +768,12 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
 
             var_hat_func = fpe.var_hat_func_Huber_single_noise
 
-    (alphas, errors, lambdas, huber_params,) = optimal_reg_param_and_huber_parameter(
+    (
+        alphas,
+        errors,
+        lambdas,
+        huber_params,
+    ) = no_parallel_optimal_reg_param_and_huber_parameter(
         var_hat_func=var_hat_func,
         alpha_1=kwargs["alpha_min"],
         alpha_2=kwargs["alpha_max"],
@@ -814,14 +819,10 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
         **theoretical_exp_dict
     )
 
-    idxs_experimental = np.arange(np.sum(alphas_theoretical <= 100)) % (
-        n_pts_theoretical // n_pts_experimental
-    )
-    idxs_experimental[-1] = True
-
-    alphas_experimental = alphas_theoretical[idxs_experimental]
-    lambdas_experimental = lambdas_theoretical[idxs_experimental]
-    huber_params_experimental = huber_params_theoretical[idxs_experimental]
+    idxs = _get_spaced_index(alphas_theoretical, n_pts_experimental)
+    alphas_experimental = alphas_theoretical[idxs]
+    lambdas_experimental = lambdas_theoretical[idxs]
+    huber_params_experimental = huber_params_theoretical[idxs]
 
     double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
     decorrelated_noise = not (kwargs.get("beta", 1.0) == 1.0)

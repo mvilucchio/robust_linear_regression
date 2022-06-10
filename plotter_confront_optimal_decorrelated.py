@@ -8,11 +8,12 @@ from itertools import product
 
 save = False
 experimental_points = True
+width = 458.63788
 random_number = np.random.randint(100)
 
 marker_cycler = ["*", "s", "P", "P", "v", "D"]
 
-deltas_large = [0.5, 1.0]  # , 2.0, 5.0, 10.0
+deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]  #
 #  reg_params = [0.01, 0.1, 1.0, 10.0, 100.0]
 percentages = [0.01, 0.05, 0.1, 0.3]  # 0.01, 0.05, 0.1, 0.3
 betas = [0.0, 0.5, 1.0]
@@ -30,8 +31,8 @@ L2_settings = [
     {
         "loss_name": "L2",
         "alpha_min": 0.01,
-        "alpha_max": 1000,
-        "alpha_pts": 100,
+        "alpha_max": 10000,
+        "alpha_pts": 150,
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
@@ -41,7 +42,23 @@ L2_settings = [
     for dl in deltas_large
 ]
 
-L2_experimantal_settings = [d.copy() for d in L2_settings]
+L2_experimantal_settings = [
+    {
+        "loss_name": "L2",
+        "alpha_min": 0.01,
+        "alpha_max": 1000,
+        "alpha_pts_theoretical": 150,
+        "alpha_pts_experimental": 21,
+        "delta_small": 0.1,
+        "delta_large": dl,
+        "percentage": p,
+        "n_features": 1000,
+        "repetitions": 10,
+        "beta": beta,
+        "experiment_type": "reg_param optimal exp",
+    }
+    for dl in deltas_large
+]
 
 L1_settings = [
     {
@@ -62,13 +79,31 @@ Huber_settings = [
     {
         "loss_name": "Huber",
         "alpha_min": 0.01,
-        "alpha_max": 1000,
-        "alpha_pts": 100,
+        "alpha_max": 10000,
+        "alpha_pts": 150,
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
         "beta": beta,
         "experiment_type": "reg_param huber_param optimal",
+    }
+    for dl in deltas_large
+]
+
+Huber_experimantal_settings = [
+    {
+        "loss_name": "Huber",
+        "alpha_min": 0.01,
+        "alpha_max": 10000,
+        "alpha_pts_theoretical": 150,
+        "alpha_pts_experimental": 21,
+        "delta_small": 0.1,
+        "delta_large": dl,
+        "percentage": p,
+        "n_features": 1000,
+        "repetitions": 10,
+        "beta": beta,
+        "experiment_type": "reg_param huber_param optimal exp",
     }
     for dl in deltas_large
 ]
@@ -94,7 +129,7 @@ fig2, (ax20, ax21) = plt.subplots(
     nrows=2, ncols=1, sharex=True, figsize=(12, 9), gridspec_kw={"height_ratios": [1, 1]}
 )
 fig2.subplots_adjust(left=0.15)
-fig2.subplots_adjust(right=0.15)
+fig2.subplots_adjust(right=0.85)
 
 # fig3, ax3 = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True,)
 # fig2, ax21 = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True,)
@@ -107,13 +142,24 @@ error_names_latex = []
 
 reg_param_lines = []
 
-for idx, (L2_d, L1_d, Huber_d, BO_d) in enumerate(
-    zip(L2_settings, L1_settings, Huber_settings, BO_settings)
-):  # BO_settings
+for idx, (L2_d, L2_e, L1_d, Huber_d, Huber_e, BO_d) in enumerate(
+    zip(
+        L2_settings,
+        L2_experimantal_settings,
+        L1_settings,
+        Huber_settings,
+        Huber_experimantal_settings,
+        BO_settings,
+    )
+):
     alphas_L2, errors_L2, lambdas_L2 = load_file(**L2_d)
+    alphas_L2_e, errors_mean_L2_e, errors_std_L2_e, _ = load_file(**L2_e)
+
     alphas_L1, errors_L1, lambdas_L1 = load_file(**L1_d)
-    # alphas_L2, errors_L2 = load_file(**L2_d)
+
     alphas_Huber, errors_Huber, lambdas_Huber, huber_params = load_file(**Huber_d)
+    alphas_Huber_e, errors_mean_Huber_e, errors_std_Huber_e, _, _ = load_file(**Huber_e)
+
     alphas_BO, errors_BO = load_file(**BO_d)
 
     color_lines.append(Line2D([0], [0], color=cmap(idx)))
@@ -121,33 +167,30 @@ for idx, (L2_d, L1_d, Huber_d, BO_d) in enumerate(
     error_names_latex.append("$\Delta_\ell = {:.2f}$".format(deltas_large[idx]))
 
     ax.plot(alphas_L2, errors_L2, label="L2", color=cmap(idx), linestyle="dotted")  #
+    ax.errorbar(
+        alphas_L2_e,
+        errors_mean_L2_e,
+        errors_std_L2_e,
+        color=cmap(idx),
+        linestyle="None",
+        marker="o",
+    )
 
     ax.plot(
         alphas_L1, errors_L1, label="L1", color=cmap(idx), linestyle="dashdot",
-    )  #
-
-    # data_H = np.load("H_exp_dl_{:.2f}.npz".format(Huber_d["delta_large"]))
-    # alphas_H_new = data_H["alphas"]
-    # errors_mean_h = data_H["errors_mean"]
-    # errors_std_h = data_H["errors_std"]
-
-    # data_l2 = np.load("L2_exp_dl_{:.2f}.npz".format(L2_d["delta_large"]))
-    # alphas_L2_new = data_l2["alphas"]
-    # errors_mean_l2 = data_l2["errors_mean"]
-    # errors_std_l2 = data_l2["errors_std"]
-
-    # ax.errorbar(
-    #     alphas_H_new,
-    #     errors_mean_h,
-    #     yerr=errors_std_h,
-    #     marker="P",
-    #     color=cmap(idx),
-    #     linestyle="None",
-    # )
+    )
 
     ax.plot(
         alphas_Huber, errors_Huber, label="Huber", color=cmap(idx), linestyle="dashed",
-    )  #
+    )
+    ax.errorbar(
+        alphas_Huber_e,
+        errors_mean_Huber_e,
+        errors_std_Huber_e,
+        color=cmap(idx),
+        linestyle="None",
+        marker="o",
+    )
 
     # ax.errorbar(
     #     alphas_L2_new,
@@ -158,10 +201,10 @@ for idx, (L2_d, L1_d, Huber_d, BO_d) in enumerate(
     #     linestyle="None",
     # )
 
-    alphas_BO, errors_BO = load_file(**BO_settings[0])
-    ax.plot(
-        alphas_BO, errors_BO, label="Bayes Optimal", color=cmap(idx), linestyle="solid",
-    )
+    # alphas_BO, errors_BO = load_file(**BO_settings[0])
+    # ax.plot(
+    #     alphas_BO, errors_BO, label="Bayes Optimal", color=cmap(idx), linestyle="solid",
+    # )
 
     ax20.plot(
         alphas_L2,

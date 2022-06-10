@@ -178,7 +178,7 @@ def generate_different_alpha(
         for a, rp, fckw in zip(alphas, reg_param, find_coefficients_fun_kwargs)
     ]
 
-    with Pool() as pool:
+    with Pool(processes=1) as pool:
         results = pool.starmap(_find_numerical_mean_std, inputs)
 
     print("---", len(results))
@@ -301,6 +301,64 @@ def find_coefficients_Huber(ys, xs, reg_param, a=1.0, max_iter=15000, tol=1e-6):
         args=(xs_norm, ys, reg_param, a),
         options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
         bounds=bounds,
+    )
+
+    if opt_res.status == 2:
+        raise ValueError(
+            "HuberRegressor convergence failed: l-BFGS-b solver terminated with %s"
+            % opt_res.message
+        )
+
+    return opt_res.x
+
+
+# @nb.njit(error_model="numpy", fastmath=True)
+def _loss_and_gradient_cutted_l2(w, xs_norm, ys, reg_param, a):
+    linear_loss = ys - xs_norm @ w
+    abs_linear_loss = np.abs(linear_loss)
+    outliers_mask = abs_linear_loss > a
+
+    outliers = abs_linear_loss[outliers_mask]
+    num_outliers = np.count_nonzero(outliers_mask)
+    n_non_outliers = xs_norm.shape[0] - num_outliers
+
+    loss = 0.0  # a * np.sum(outliers) - 0.5 * num_outliers * a ** 2
+
+    non_outliers = linear_loss[~outliers_mask]
+    loss += 0.5 * np.dot(non_outliers, non_outliers)
+    loss += 0.5 * reg_param * np.dot(w, w)
+
+    xs_non_outliers = -axis0_safe_slice(xs_norm, ~outliers_mask, n_non_outliers)
+    gradient = safe_sparse_dot(non_outliers, xs_non_outliers)
+
+    signed_outliers = np.ones_like(outliers)
+    signed_outliers_mask = linear_loss[outliers_mask] < 0
+    signed_outliers[signed_outliers_mask] = -1.0
+
+    xs_outliers = axis0_safe_slice(xs_norm, outliers_mask, num_outliers)
+
+    # gradient -= a * safe_sparse_dot(signed_outliers, xs_outliers)
+    gradient += reg_param * w
+
+    return loss  # , gradient
+
+
+def find_coefficients_cutted_l2(ys, xs, reg_param, a=1.0, max_iter=150, tol=1e-3):
+    _, d = xs.shape
+    w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+    xs_norm = np.divide(xs, np.sqrt(d))
+
+    bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
+    bounds[-1][0] = np.finfo(np.float64).eps * 10
+
+    opt_res = optimize.minimize(
+        _loss_and_gradient_cutted_l2,
+        w,
+        # method="L-BFGS-B",
+        # jac=True,
+        args=(xs_norm, ys, reg_param, a),
+        options={"maxiter": max_iter, "gtol": tol},
+        # bounds=bounds,
     )
 
     if opt_res.status == 2:

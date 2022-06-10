@@ -13,15 +13,22 @@ from multiprocessing import Pool
 from tqdm.auto import tqdm
 from src.utils import load_file
 
-
+# y is fixedto zero
 @vectorize
-def integrate_fun(z, V, omega, beta, delta_large, a, alpha):
-    if :
-        return np.exp(-(z ** 2) / 2) * 
-    elif :
-        return np.exp(-(z ** 2) / 2) * 
+def integrate_fun_outliers(z, V, omega, delta, mu):
+    if np.abs(np.sqrt(V) * z + omega) > delta:
+        return (
+            0.5
+            # / np.sqrt(2 * np.pi)
+            # * np.exp(-0.5 * z ** 2)
+            * (mu / (1 + mu))
+            * (delta ** mu)
+            * np.abs(1 / (np.sqrt(V) * z + omega)) ** (mu + 1.0)
+        )
     else:
-        return np.exp(-(z ** 2) / 2) * np.exp()
+        return (
+            0.5 * mu / ((1 + mu) * delta)  # / np.sqrt(2 * np.pi) * np.exp(-0.5 * z ** 2)
+        )  #
 
 
 # @vectorize
@@ -34,12 +41,12 @@ def integrate_fun(z, V, omega, beta, delta_large, a, alpha):
 #         return np.exp(-(z ** 2) / 2) * np.exp(-np.abs(-np.sqrt(V) * z - omega) / 2)
 
 
-def minimize_fun(omega, x, V, eps, delta_small, delta_large, beta):
-    return (
-        (x - omega) ** 2 / (2 * V)
-        + np.log(
-            quad(integrate_fun, -100, 100, args=(V, omega, beta, delta_large))
-        )
+def minimize_fun(omega, x, V, eps, delta, mu):
+    return (x - omega) ** 2 / (2 * V) + np.log(
+        (1 - eps)
+        / np.sqrt(2 * np.pi * (delta + V))
+        * np.exp(-0.5 * omega ** 2 / (delta + V))
+        + eps * quad(integrate_fun_outliers, -500, 500, args=(V, omega, delta, mu))[0]
     )
 
 
@@ -55,13 +62,8 @@ def minimize_fun(omega, x, V, eps, delta_small, delta_large, beta):
 #     )
 
 
-def _minimize_my(x, V, eps, delta_small, delta_large, beta):
-    res = minimize(
-        minimize_fun,
-        x0=np.abs(x),
-        args=(x, V, eps, delta_small, delta_large, beta),
-        tol=1e-1,
-    )
+def _minimize_my(x, V, eps, delta, mu):
+    res = minimize(minimize_fun, x0=np.abs(x), args=(x, V, eps, delta, mu), tol=1e-1,)
     if res.success:
         return -res.fun
     else:
@@ -70,51 +72,43 @@ def _minimize_my(x, V, eps, delta_small, delta_large, beta):
 
 if __name__ == "__main__":
 
-    percentage, delta_small, delta_large = 0.1, 0.1, 5.0
-    eps, beta = percentage, 1.0
-    delta_large = [0.5, 1.0, 2.0, 5.0, 10.0]
+    eps, V, mu = 0.3, 0.01, 1.5
+    mus = [0.5, 1.5, 2.5]
+    epses = [0.01, 0.05, 0.1, 0.3]
+    deltas = [0.5, 1.0, 2.0, 5.0, 10.0]
+    delta = 5.0
 
-    experiments_settings = [
-        {
-            # "loss_name": "L2",
-            "alpha_min": 0.01,
-            "alpha_max": 100,
-            "alpha_pts": 20,
-            # "alpha_pts_theoretical": 36,
-            # "alpha_pts_experimental": 4,
-            # "reg_param": 1.0,
-            # "delta": 0.5,
-            "delta_small": delta_small,
-            "delta_large": dl,
-            "percentage": percentage,
-            # "n_features": 500,
-            #  "repetitions": 4,
-            "beta": beta,
-            "experiment_type": "BO",
-        }
-        for dl in delta_large
-    ]
+    xs = np.linspace(-30, 30, 300)
 
-    for exp_d, dl in zip(tqdm(experiments_settings), delta_large):
-        alphas, Vs = load_file(**exp_d)
+    # loss_values = np.empty((len(epses), len(xs)))
+    loss_values = np.empty((len(deltas), len(xs)))
 
-        for a, V in zip(alphas, Vs):
+    for jdx, d in enumerate(deltas):
 
-            xs = np.linspace(-30, 30, 300)
-            loss_values = np.empty_like(xs)
+        inputs = [(x, V, eps, d, mu) for x in xs]
 
-            inputs = [(x, V, eps, delta_small, dl, beta) for x in xs]
+        with Pool() as pool:
+            results = pool.starmap(_minimize_my, inputs)
 
-            with Pool() as pool:
-                results = pool.starmap(_minimize_my, inputs)
+        for idx, l in enumerate(results):
+            loss_values[jdx][idx] = l
 
-            for idx, l in enumerate(results):
-                loss_values[idx] = l
+    for idx, d in enumerate(deltas):
+        plt.plot(xs, loss_values[jdx], label=r"$\Delta$ = {:.1f}".format(d))
 
-            np.savez(
-                "ass_optimal_loss_double_gauss_{}_{}_{}_{}_{}".format(
-                    eps, delta_small, dl, beta, a
-                ),
-                x=xs,
-                loss=loss_values,
-            )
+    # plt.yscale("log")
+    # plt.xscale("log")
+    plt.legend()
+    plt.show()
+
+    # xs = np.linspace(-15, 15, 2000)
+    # for m in [0.5, 1.5, 2.5, 5.0, 10.0]:
+    #     plt.plot(
+    #         xs,
+    #         integrate_fun_outliers(xs, 1, 0, 3.5, m),
+    #         label=r"$\mu = {:.2f}$".format(m),
+    #     )
+    # plt.legend()
+    # plt.grid()
+
+    # plt.show()

@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 import src.plotting_utils as pu
-
+from src.numerics import find_coefficients_cutted_l2, generate_different_alpha
+import src.numerics as num
 from src.utils import (
     check_saved,
     load_file,
@@ -64,57 +65,40 @@ if __name__ == "__main__":
 
     n_exp = len(theory_settings)
 
-    alphas_num = [None] * n_exp
-    errors_mean_num = [None] * n_exp
-    errors_std_num = [None] * n_exp
-
-    alphas_theory = [None] * n_exp
-    errors_theory = [None] * n_exp
-
-    for idx, (exp_dict, theory_dict) in enumerate(
-        zip(tqdm(experimental_settings, desc="reg_param", leave=False), theory_settings)
-    ):
-        file_exists, file_path = check_saved(**theory_dict)
-
-        print("file exists", file_exists)
-
-        if not file_exists:
-            experiment_runner(**theory_dict)
-
-        theory_dict.update({"file_path": file_path})
-        alphas_theory[idx], errors_theory[idx] = load_file(**theory_dict)
-
-        # file_exists, file_path = check_saved(**exp_dict)
-        # print("file exists", file_exists)
-
-        # if not file_exists:
-        #     experiment_runner(**exp_dict)
-
-        # exp_dict.update({"file_path": file_path})
-        # alphas_num[idx], errors_mean_num[idx], errors_std_num[idx] = load_file(**exp_dict)
+    alphas, errors_mean, errors_std = generate_different_alpha(
+        num.measure_gen_decorrelated,
+        num.find_coefficients_cutted_l2,
+        alpha_1=0.01,
+        alpha_2=10,
+        n_features=200,
+        n_alpha_points=13,
+        repetitions=5,
+        reg_param=0.5,
+        measure_fun_kwargs={
+            "delta_small": 0.1,
+            "delta_large": 10.0,
+            "percentage": 0.1,
+            "beta": 0.0,
+        },
+        find_coefficients_fun_kwargs={"a": 1.0},
+        alphas=None,
+    )
 
     # ------------
 
     pu.initialization_mpl()
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True)
+    # ax.plot(
+    #     al_t,
+    #     err_t,
+    #     # linewidth=1,
+    #     # marker='.',
+    #     label=r"$\lambda = {}$".format(reg_params[idx]),
+    #     color=colormap(idx + 3),
+    # )
 
-    for idx, (al_n, err_m, err_s, al_t, err_t) in enumerate(
-        zip(alphas_num, errors_mean_num, errors_std_num, alphas_theory, errors_theory)
-    ):
-        colormap = get_cmap(n_exp + 3)
-        ax.plot(
-            al_t,
-            err_t,
-            # linewidth=1,
-            # marker='.',
-            label=r"$\lambda = {}$".format(reg_params[idx]),
-            color=colormap(idx + 3),
-        )
-
-        # ax.errorbar(
-        #     al_n, err_m, err_s, marker=".", linestyle="None", color=colormap(idx + 3),
-        # )
+    ax.errorbar(alphas, errors_mean, errors_std, marker=".", linestyle="None")
 
     # ax.set_title(
     #     r"{} Loss - $\Delta = [{:.2f}, {:.2f}], \epsilon = {:.2f}$".format(

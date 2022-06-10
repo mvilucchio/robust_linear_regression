@@ -24,6 +24,8 @@ def state_equations(
     m, q, sigma = init[0], init[1], init[2]
     err = 1.0
     blend = BLEND
+
+    # print("alpha : {:.3f} a : {:.9f} reg_par : {:.7f}".format(alpha, var_hat_kwargs["a"], reg_param))
     while err > TOL_FPE:
         m_hat, q_hat, sigma_hat = var_hat_func(m, q, sigma, alpha, **var_hat_kwargs)
 
@@ -38,8 +40,8 @@ def state_equations(
         sigma = blend * sigma + (1 - blend) * temp_sigma
 
         # print(
-        #     "  err: {:.8f} alpha : {:.2f} m = {:.9f}; q = {:.9f}; \[CapitalSigma] = {:.9f}; reg_par : {:.7f}".format(
-        #         err, alpha, m, q, sigma, reg_param
+        #     "  err: {:.8f} alpha : {:.2f} m = {:.9f}; q = {:.9f}; \[CapitalSigma] = {:.9f}; a : {:.9f} reg_par : {:.7f}".format(
+        #         err, alpha, m, q, sigma, var_hat_kwargs["a"], reg_param
         #     )
         # )
 
