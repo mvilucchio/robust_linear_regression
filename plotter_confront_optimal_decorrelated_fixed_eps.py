@@ -6,37 +6,38 @@ import matplotlib.pyplot as plt
 import numpy as np
 from itertools import product
 
-save = False
+save = True
 experimental_points = True
-width = 458.63788
+width = 1.0 * 458.63788
 random_number = np.random.randint(100)
 
 marker_cycler = ["*", "s", "P", "P", "v", "D"]
 
-deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]  #
+deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]  # [0.5, 1.0, 2.0, 5.0, 10.0]  #
 #  reg_params = [0.01, 0.1, 1.0, 10.0, 100.0]
 percentages = [0.01, 0.05, 0.1, 0.3]  # 0.01, 0.05, 0.1, 0.3
 betas = [0.0, 0.5, 1.0]
 
 index_dl = 3
-index_beta = 0
+index_beta = 2
 index_per = 3
 dl = deltas_large[index_dl]
 beta = betas[index_beta]
 p = percentages[index_per]
 
 # percentages.reverse()
+#  for dl in deltas_large
 
 L2_settings = [
     {
         "loss_name": "L2",
         "alpha_min": 0.01,
-        "alpha_max": 10000,
-        "alpha_pts": 150,
+        "alpha_max": 100000,
+        "alpha_pts": 100,
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
-        "beta": beta,
+        # "beta": beta,
         "experiment_type": "reg_param optimal",
     }
     for dl in deltas_large
@@ -46,7 +47,7 @@ L2_experimantal_settings = [
     {
         "loss_name": "L2",
         "alpha_min": 0.01,
-        "alpha_max": 1000,
+        "alpha_max": 100000,
         "alpha_pts_theoretical": 150,
         "alpha_pts_experimental": 21,
         "delta_small": 0.1,
@@ -54,7 +55,7 @@ L2_experimantal_settings = [
         "percentage": p,
         "n_features": 1000,
         "repetitions": 10,
-        "beta": beta,
+        # "beta": beta,
         "experiment_type": "reg_param optimal exp",
     }
     for dl in deltas_large
@@ -64,13 +65,30 @@ L1_settings = [
     {
         "loss_name": "L1",
         "alpha_min": 0.01,
-        "alpha_max": 1000,
+        "alpha_max": 100000,
         "alpha_pts": 100,
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
-        "beta": beta,
+        # "beta": beta,
         "experiment_type": "reg_param optimal",
+    }
+    for dl in deltas_large
+]
+L1_experimantal_settings = [
+    {
+        "loss_name": "L1",
+        "alpha_min": 0.01,
+        "alpha_max": 100000,
+        "alpha_pts_theoretical": 100,
+        "alpha_pts_experimental": 21,
+        "delta_small": 0.1,
+        "delta_large": dl,
+        "percentage": p,
+        "n_features": 200,
+        "repetitions": 5,
+        # "beta": beta,
+        "experiment_type": "reg_param optimal exp",
     }
     for dl in deltas_large
 ]
@@ -79,12 +97,12 @@ Huber_settings = [
     {
         "loss_name": "Huber",
         "alpha_min": 0.01,
-        "alpha_max": 10000,
-        "alpha_pts": 150,
+        "alpha_max": 100000,
+        "alpha_pts": 100,
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
-        "beta": beta,
+        # "beta": beta,
         "experiment_type": "reg_param huber_param optimal",
     }
     for dl in deltas_large
@@ -94,15 +112,15 @@ Huber_experimantal_settings = [
     {
         "loss_name": "Huber",
         "alpha_min": 0.01,
-        "alpha_max": 10000,
-        "alpha_pts_theoretical": 150,
+        "alpha_max": 100000,
+        "alpha_pts_theoretical": 100,
         "alpha_pts_experimental": 21,
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
         "n_features": 1000,
         "repetitions": 10,
-        "beta": beta,
+        # "beta": beta,
         "experiment_type": "reg_param huber_param optimal exp",
     }
     for dl in deltas_large
@@ -116,7 +134,7 @@ BO_settings = [
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
-        "beta": beta,
+        # "beta": beta,
         "experiment_type": "BO",
     }
     for dl in deltas_large
@@ -124,12 +142,40 @@ BO_settings = [
 
 pu.initialization_mpl()
 
-fig, ax = plt.subplots(1, 1, figsize=(12, 9), tight_layout=True,)
+tuple_size = pu.set_size(width, fraction=0.49)
+
+fig, ax = plt.subplots(1, 1, figsize=tuple_size)  # , tight_layout=True,
+# fig.subplots_adjust(left=0.15)
+# fig.subplots_adjust(bottom=0.0)
+# fig.subplots_adjust(right=0.99)
+fig.subplots_adjust(left=0.2)
+fig.subplots_adjust(bottom=0.2)
+fig.subplots_adjust(top=0.99)
+fig.subplots_adjust(right=0.99)
+
+figleg1 = plt.figure(figsize=(tuple_size[0], tuple_size[1] / 17))
+figleg2 = plt.figure(figsize=(tuple_size[0], tuple_size[1] / 7))
+
+
 fig2, (ax20, ax21) = plt.subplots(
-    nrows=2, ncols=1, sharex=True, figsize=(12, 9), gridspec_kw={"height_ratios": [1, 1]}
+    nrows=2,
+    ncols=1,
+    sharex=True,
+    figsize=tuple_size,
+    gridspec_kw={"height_ratios": [1, 1]},
+    # tight_layout=True,
 )
-fig2.subplots_adjust(left=0.15)
-fig2.subplots_adjust(right=0.85)
+fig2.subplots_adjust(left=0.2)
+fig2.subplots_adjust(bottom=0.2)
+fig2.subplots_adjust(top=0.99)
+fig2.subplots_adjust(right=0.99)
+
+# fig, ax = plt.subplots(1, 1, figsize=(12, 9), tight_layout=True,)
+# fig2, (ax20, ax21) = plt.subplots(
+#     nrows=2, ncols=1, sharex=True, figsize=(12, 9), gridspec_kw={"height_ratios": [1, 1]}
+# )
+# fig2.subplots_adjust(left=0.15)
+# fig2.subplots_adjust(right=0.85)
 
 # fig3, ax3 = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True,)
 # fig2, ax21 = plt.subplots(1, 1, figsize=(10, 8), tight_layout=True,)
@@ -142,11 +188,12 @@ error_names_latex = []
 
 reg_param_lines = []
 
-for idx, (L2_d, L2_e, L1_d, Huber_d, Huber_e, BO_d) in enumerate(
+for idx, (L2_d, L2_e, L1_d, L1_e, Huber_d, Huber_e, BO_d) in enumerate(
     zip(
         L2_settings,
         L2_experimantal_settings,
         L1_settings,
+        L1_experimantal_settings,
         Huber_settings,
         Huber_experimantal_settings,
         BO_settings,
@@ -156,6 +203,7 @@ for idx, (L2_d, L2_e, L1_d, Huber_d, Huber_e, BO_d) in enumerate(
     alphas_L2_e, errors_mean_L2_e, errors_std_L2_e, _ = load_file(**L2_e)
 
     alphas_L1, errors_L1, lambdas_L1 = load_file(**L1_d)
+    # alphas_L1_e, errors_mean_L1_e, errors_std_L1_e, _ = load_file(**L1_e)
 
     alphas_Huber, errors_Huber, lambdas_Huber, huber_params = load_file(**Huber_d)
     alphas_Huber_e, errors_mean_Huber_e, errors_std_Huber_e, _, _ = load_file(**Huber_e)
@@ -163,22 +211,34 @@ for idx, (L2_d, L2_e, L1_d, Huber_d, Huber_e, BO_d) in enumerate(
     alphas_BO, errors_BO = load_file(**BO_d)
 
     color_lines.append(Line2D([0], [0], color=cmap(idx)))
-    error_names.append("Large Noise = ${:.2f}$".format(deltas_large[idx]))
-    error_names_latex.append("$\Delta_\ell = {:.2f}$".format(deltas_large[idx]))
+    error_names.append("Large Noise = ${:.1f}$".format(deltas_large[idx]))
+    error_names_latex.append("$\Delta_\ell = {:.1f}$".format(deltas_large[idx]))
 
-    ax.plot(alphas_L2, errors_L2, label="L2", color=cmap(idx), linestyle="dotted")  #
+    ax.plot(
+        alphas_L2, errors_L2, label=r"$\ell_2$", color=cmap(idx), linestyle="dotted"
+    )  #
     ax.errorbar(
         alphas_L2_e,
         errors_mean_L2_e,
         errors_std_L2_e,
         color=cmap(idx),
         linestyle="None",
-        marker="o",
+        marker=".",
+        markersize=1.0,
     )
 
     ax.plot(
-        alphas_L1, errors_L1, label="L1", color=cmap(idx), linestyle="dashdot",
+        alphas_L1, errors_L1, label=r"$\ell_1$", color=cmap(idx), linestyle="dashdot",
     )
+    # ax.errorbar(
+    #     alphas_L1_e,
+    #     errors_mean_L1_e,
+    #     errors_std_L1_e,
+    #     color=cmap(idx),
+    #     linestyle="None",
+    #     marker=".",
+    #     markersize=1.0,
+    # )
 
     ax.plot(
         alphas_Huber, errors_Huber, label="Huber", color=cmap(idx), linestyle="dashed",
@@ -189,27 +249,19 @@ for idx, (L2_d, L2_e, L1_d, Huber_d, Huber_e, BO_d) in enumerate(
         errors_std_Huber_e,
         color=cmap(idx),
         linestyle="None",
-        marker="o",
+        marker=".",
+        markersize=1.0,
     )
 
-    # ax.errorbar(
-    #     alphas_L2_new,
-    #     errors_mean_l2,
-    #     yerr=errors_std_l2,
-    #     marker="D",
-    #     color=cmap(idx),
-    #     linestyle="None",
-    # )
-
-    # alphas_BO, errors_BO = load_file(**BO_settings[0])
-    # ax.plot(
-    #     alphas_BO, errors_BO, label="Bayes Optimal", color=cmap(idx), linestyle="solid",
-    # )
+    alphas_BO, errors_BO = load_file(**BO_settings[0])
+    ax.plot(
+        alphas_BO, errors_BO, label="BO", color=cmap(idx), linestyle="solid",
+    )
 
     ax20.plot(
         alphas_L2,
         lambdas_L2,
-        label="L2",
+        label=r"$\ell_2$",
         linestyle="dotted",
         # marker="P",
         color=cmap(idx),
@@ -222,7 +274,7 @@ for idx, (L2_d, L2_e, L1_d, Huber_d, Huber_e, BO_d) in enumerate(
     ax20.plot(
         alphas_L1,
         lambdas_L1,
-        label="L1",
+        label=r"$\ell_1$",
         linestyle="dashdot",  #  ("dashdotted", (0, (3, 5, 1, 5))),
         # marker="P",
         color=cmap(idx),
@@ -289,17 +341,22 @@ loss_lines_relative = [
     Line2D([0], [0], color="k", linestyle="dashed"),
 ]
 
-first_legend = ax.legend(
-    loss_lines,
-    ["L2", "L1", "Huber", "BayesOptimal"],
-    loc="lower left",
-    bbox_to_anchor=(0.0, 0.5),
-)
-ax.add_artist(first_legend)
-ax.legend(color_lines, error_names_latex, loc="lower left")
+figleg1.legend(loss_lines, [r"$\ell_2$", r"$\ell_1$", "Huber", "BO"], "center", ncol=4)
+figleg2.legend(color_lines, error_names_latex, "center", ncol=3, handlelength=2.1)
+
+# first_legend = ax.legend(
+#     loss_lines,
+#     [r"$\ell_2$", r"$\ell_1$", "Huber", "BO"],
+#     loc="lower left",
+#     bbox_to_anchor=(0.0, 0.25),
+# )
+# ax.add_artist(first_legend)
+# ax.legend(
+#     color_lines, error_names_latex, loc="lower left", bbox_to_anchor=(0.0, 0.0),
+# )
 
 ax.set_ylabel(
-    r"Generalization Error: $\frac{1}{d} \mathbb{E}\qty[\norm{\bf{\hat{w}} - \bf{w^\star}}^2]$"
+    r"$\frac{1}{d} \mathbb{E}[\norm{\bf{\hat{w}} - \bf{w^\star}}^2]$"  # Generalization Error:
 )
 ax.set_xlabel(r"$\alpha$")
 ax.set_xscale("log")
@@ -309,30 +366,34 @@ ax.set_yscale("log")
 # ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
 fig2.subplots_adjust(wspace=0, hspace=0)
-ax20.set_ylabel("Optimal Regularization\nParameter")
-ax21.set_ylabel("Optimal Huber\nPrameter")
+ax20.set_ylabel(r"$\lambda_{\mathrm{opt}}$")  # "Opt. Reg.\nParameter"
+ax21.set_ylabel(r"$a_{\mathrm{opt}}$")  # "Opt. Huber\nParameter"
 ax21.set_xlabel(r"$\alpha$")
 ax20.set_xscale("log")
+ax20.tick_params(axis="y", which="major", pad=5)
 # ax20.set_yscale("log")
 ax20.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
 ax21.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
-ax21.tick_params(axis="y", which="major", pad=7)
-ax21.set_yscale("log")
-# ax21.set_xlim([0.009, 110])
+ax21.tick_params(axis="y", which="major", pad=5)
+# ax21.set_yscale("log")
+# ax21.set_xlim([100, 100000])
 # ax20.legend()
-#  ax21.legend()
+# ax21.legend()
 # ax20.legend()
 
-box = ax20.get_position()
-ax20.set_position([box.x0, box.y0, box.width * 0.9, box.height])
-box2 = ax21.get_position()
-ax21.set_position([box2.x0, box2.y0, box2.width * 0.9, box2.height])
+# box = ax20.get_position()
+# ax20.set_position([box.x0, box.y0, box.width * 0.9, box.height])
+# box2 = ax21.get_position()
+# ax21.set_position([box2.x0, box2.y0, box2.width * 0.9, box2.height])
 
-second_legend = ax20.legend(
-    loss_lines_relative, ["L2", "L1", "Huber"], loc="lower left", bbox_to_anchor=(1, 0.3)
-)
-ax20.add_artist(second_legend)
-ax21.legend(color_lines, error_names_latex, loc="lower left", bbox_to_anchor=(1, 0.7))
+# second_legend = ax21.legend(
+#     loss_lines_relative,
+#     [r"$\ell_2$", r"$\ell_1$", "Huber"],
+#     loc="upper left",
+#     bbox_to_anchor=(0.5, 1.0),
+# )
+# ax21.add_artist(second_legend)
+# ax20.legend(color_lines, error_names_latex, loc="upper left", bbox_to_anchor=(0.45, 1.0))
 
 
 # third_legend = ax3.legend(loss_lines_relative, ["L2", "Huber"])
@@ -345,19 +406,32 @@ ax21.legend(color_lines, error_names_latex, loc="lower left", bbox_to_anchor=(1,
 # ax3.set_yscale("log")
 # ax21.set_xlim([0.009, 110])
 
+
 if save:
-    pu.save_plot(
-        fig,
-        "total_optimal_confronts_fixed_percentage_{:.2f}_beta_{:.2f}_dl_{:.2f}".format(
-            percentages[index_per], betas[index_beta], dl
-        ),
-    )
+    # pu.save_plot(
+    #     fig,
+    #     "total_optimal_confronts_fixed_percentage_{:.2f}_beta_{:.2f}".format(
+    #         percentages[index_per], betas[index_beta]
+    #     ),
+    # )
     pu.save_plot(
         fig2,
-        "total_optimal_confronts_params_fixed_percentage_{:.2f}_beta_{:.2f}_dl_{:.2f}".format(
-            percentages[index_per], betas[index_beta], dl
+        "total_optimal_confronts_params_fixed_percentage_{:.2f}_beta_{:.2f}".format(
+            percentages[index_per], betas[index_beta]
         ),
     )
+    # pu.save_plot(
+    #     figleg1,
+    #     "total_optimal_confronts_leg1_fixed_percentage_{:.2f}_beta_{:.2f}".format(
+    #         percentages[index_per], betas[index_beta]
+    #     ),
+    # )
+    # pu.save_plot(
+    #     figleg2,
+    #     "total_optimal_confronts_leg2_fixed_percentage_{:.2f}_beta_{:.2f}".format(
+    #         percentages[index_per], betas[index_beta]
+    #     ),
+    # )
     # pu.save_plot(
     #     fig3,
     #     "total_optimal_confronts_relative_fixed_percentage_{:.2f}".format(

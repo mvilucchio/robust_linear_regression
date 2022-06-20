@@ -2,9 +2,9 @@ import numpy as np
 from scipy.integrate import romb
 from numba import njit
 
-MULT_INTEGRAL = 10
-TOL_INT = 1e-6
-N_TEST_POINTS = 100
+MULT_INTEGRAL = 12
+TOL_INT = 1e-8
+N_TEST_POINTS = 200
 K_ROMBERG = 13
 
 # if _check_nested_list(square_borders):

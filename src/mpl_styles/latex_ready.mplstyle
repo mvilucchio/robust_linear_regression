@@ -1,16 +1,20 @@
-lines.linewidth: 3.0
+lines.linewidth: 1.0
 
-font.size: 24
-font.family: 'xyzxyz'
+font.size: 10
+font.family: 'serif'
 
 
 text.usetex: True
-text.latex.preamble: \usepackage{amsfonts}\usepackage{physics}
+text.latex.preamble: \usepackage{amsfonts}\usepackage{physics}\usepackage{amsmath}
 
 
 legend.edgecolor: 'w'
-legend.handlelength: 1.4
-legend.fontsize: 22
+legend.handlelength: 2.5
+legend.fontsize: 8
+
+xtick.labelsize: 8
+ytick.labelsize: 8
+axes.labelsize: 10
 
 
 axes.grid: True
@@ -19,16 +23,16 @@ axes.grid.which: both
 axes.axisbelow: True
 
 
-xtick.major.width: 1.0
-xtick.major.size: 3.5
-xtick.minor.visible: True
+# xtick.major.width: 1.0
+# xtick.major.size: 3.5
+# xtick.minor.visible: True
 
-ytick.major.width: 1.0
-ytick.major.size: 3.5
-ytick.minor.visible: True
+# ytick.major.width: 1.0
+# ytick.major.size: 3.5
+# ytick.minor.visible: True
 
 
 grid.color: b0b0b0
 grid.linestyle: --
-grid.linewidth: 1.0
+grid.linewidth: 0.5
 grid.alpha: 0.8   

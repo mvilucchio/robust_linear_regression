@@ -14,7 +14,7 @@ import matplotlib.ticker as ticker
 # def myfmt(x, pos):
 #     return "{0:.1f}".format(x)
 width = 1.0 * 458.63788
-save = True
+save = False
 random_number = np.random.randint(100)
 
 marker_cycler = ["*", "s", "P", "P", "v", "D"]
@@ -54,20 +54,17 @@ experiments_settings = [
     for dl in delta_large
 ]
 
-indice = 4
+A = 1.0
+indice = 3
 alphas, _ = load_file(**experiments_settings[indice])
-# alphas = np.flip(alphas)
+deltas = [0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+betas = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+# alphas = np.flip(alphas) optimal_loss_huber_like_1.0_0.1_0.1_5.0_0.0.npz
 files_s = [
-    "dump/optimal_loss_double_gauss_{}_{}_{}_{}_{}.npz".format(
-        eps, delta_small, delta_large[indice], beta, a
-    )
-    for a in alphas
+    "dump/connected_optimal_loss_huber_like_{}_{}.npz".format(A, d) for d in deltas
 ]
 files_a = [
-    "dump/ass_optimal_loss_double_gauss_{}_{}_{}_{}_{}.npz".format(
-        eps, delta_small, delta_large[indice], beta, a
-    )
-    for a in alphas
+    "dump/ass_connected_optimal_loss_huber_like_{}_{}.npz".format(A, d) for d in deltas
 ]
 
 
@@ -96,7 +93,7 @@ error_names_latex = []
 
 reg_param_lines = []
 
-norm = mpl.colors.LogNorm(vmin=0.01, vmax=100)
+norm = mpl.colors.Normalize(vmin=0, vmax=10)
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 sm.set_array([])
 
@@ -122,7 +119,8 @@ ax1.set_ylabel(r"$\ell_{\mathrm{opt}}(0,z)$")
 ax1.set_xlabel(r"$z$")
 # ax1.set_xscale("log")
 # ax1.set_yscale("log")
-# ax1.set_ylim([1.5, 20])
+ax1.set_xlim([-20, 20])
+ax1.set_ylim([0, 10])
 # ax1.legend(prop={"size": 22})
 
 # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -135,35 +133,31 @@ ax2.set_yscale("log")
 
 cbar = fig1.colorbar(
     sm,
+    ticks=np.linspace(0, 10, 5)
     # ticks=np.logspace(-2, 2, 10),# (0.2, 2.1, step),  # np.logspace(-2, 2, 10),  #
     # boundaries=np.logspace(0.15, 2.15, step),
     # format=ticker.FuncFormatter(myfmt),
 )
 
-cbar.ax.set_title(r"$\alpha$")
+cbar.ax.set_title(r"$\Delta$")
 cbar.ax.minorticks_off()
 
 cbar2 = fig2.colorbar(
     sm,
+    ticks=np.linspace(0, 10, 5)
     # ticks=np.logspace(-2, 2, 10),# (0.2, 2.1, step),  # np.logspace(-2, 2, 10),  #
     # boundaries=np.logspace(0.15, 2.15, step),
     # format=ticker.FuncFormatter(myfmt),
 )
 
-cbar2.ax.set_title(r"$\alpha$")
+cbar2.ax.set_title(r"$\Delta$")
 cbar2.ax.minorticks_off()
 
 if save:
     pu.save_plot(
-        fig1,
-        "optimal_losses_double_gaussian_different_alphas_eps_{}_ds_{}_dl_{}_beta_{}".format(
-            eps, delta_small, delta_large[indice], beta
-        ),
+        fig1, "optimal_losses_huber_like_connected_different_A_{}".format(A),
     )
-    pu.save_plot(
-        fig2,
-        "loglog_optimal_losses_double_gaussian_different_alphas_eps_{}_ds_{}_dl_{}_beta_{}".format(
-            eps, delta_small, delta_large[indice], beta
-        ),
-    )
+    # pu.save_plot(
+    #     fig2, "loglog_optimal_huber_like_connected_different_A_{}".format(A),
+    # )
 plt.show()

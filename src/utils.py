@@ -8,11 +8,33 @@ from src.optimal_lambda import (
     optimal_reg_param_and_huber_parameter,
     no_parallel_optimal_reg_param_and_huber_parameter,
 )
+from src.fpeqs_BO import (
+    var_func_BO,
+    var_hat_func_BO_single_noise,
+    var_hat_func_BO_num_double_noise,
+    var_hat_func_BO_num_decorrelated_noise,
+)
+from src.fpeqs_L2 import (
+    var_func_L2,
+    var_hat_func_L2_single_noise,
+    var_hat_func_L2_double_noise,
+    var_hat_func_L2_decorrelated_noise,
+)
+from src.fpeqs_L1 import (
+    var_hat_func_L1_single_noise,
+    var_hat_func_L1_double_noise,
+    var_hat_func_L1_decorrelated_noise,
+)
+from src.fpeqs_Huber import (
+    var_hat_func_Huber_single_noise,
+    var_hat_func_Huber_double_noise,
+    var_hat_func_Huber_decorrelated_noise,
+)
 
 
 def _get_spaced_index(array, num_elems, max_val=100):
     cond_array = array <= max_val
-    return np.round(np.linspace(0, len(cond_array) - 1, num_elems)).astype(int)
+    return np.round(np.linspace(0, len(array[cond_array]) - 1, num_elems)).astype(int)
 
 
 DATA_FOLDER_PATH = "/Users/matteovilucchio/Documents/ENS/HProblem/robust_linear_regression/data"  # "./data"  # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  #
@@ -349,9 +371,9 @@ def theory_curve_runner(**kwargs):
                 break
 
         var_functions = [
-            fpe.var_hat_func_L2_decorrelated_noise,
-            fpe.var_hat_func_L1_decorrelated_noise,  # fpe.var_hat_func_L1_num_decorrelated_noise,
-            fpe.var_hat_func_Huber_decorrelated_noise,  # fpe.var_hat_func_Huber_num_decorrelated_noise,
+            var_hat_func_L2_decorrelated_noise,
+            var_hat_func_L1_decorrelated_noise,  # var_hat_func_L1_num_decorrelated_noise,
+            var_hat_func_Huber_decorrelated_noise,  # var_hat_func_Huber_num_decorrelated_noise,
             -1,
         ]
     else:
@@ -377,9 +399,9 @@ def theory_curve_runner(**kwargs):
                     break
 
             var_functions = [
-                fpe.var_hat_func_L2_double_noise,
-                fpe.var_hat_func_L1_double_noise,  # fpe.var_hat_func_L1_num_double_noise,
-                fpe.var_hat_func_Huber_double_noise,  # fpe.var_hat_func_Huber_num_double_noise,
+                var_hat_func_L2_double_noise,
+                var_hat_func_L1_double_noise,  # var_hat_func_L1_num_double_noise,
+                var_hat_func_Huber_double_noise,  # var_hat_func_Huber_num_double_noise,
                 -1,
             ]
         else:
@@ -396,9 +418,9 @@ def theory_curve_runner(**kwargs):
                     break
 
             var_functions = [
-                fpe.var_hat_func_L2_single_noise,
-                fpe.var_hat_func_L1_single_noise,  # fpe.var_hat_func_L1_num_single_noise,
-                fpe.var_hat_func_Huber_single_noise,  # fpe.var_hat_func_Huber_num_single_noise,
+                var_hat_func_L2_single_noise,
+                var_hat_func_L1_single_noise,  # var_hat_func_L1_num_single_noise,
+                var_hat_func_Huber_single_noise,  # var_hat_func_Huber_num_single_noise,
                 -1,
             ]
 
@@ -406,7 +428,7 @@ def theory_curve_runner(**kwargs):
         var_hat_kwargs.update({"a": kwargs["a"]})
 
     alphas, [errors] = fpe.no_parallel_different_alpha_observables_fpeqs(
-        fpe.var_func_L2,
+        var_func_L2,
         _loss_type_chose(kwargs["loss_name"], values=var_functions),
         alpha_1=kwargs["alpha_min"],
         alpha_2=kwargs["alpha_max"],
@@ -448,7 +470,7 @@ def bayes_optimal_runner(**kwargs):
                 initial_condition = [m, q, sigma]
                 break
 
-        var_function = fpe.var_hat_func_BO_num_decorrelated_noise
+        var_function = var_hat_func_BO_num_decorrelated_noise
     else:
         if double_noise:
             var_hat_kwargs = {
@@ -470,8 +492,9 @@ def bayes_optimal_runner(**kwargs):
                 ):
                     initial_condition = [m, q, sigma]
                     break
-
-            var_function = fpe.var_hat_func_BO_double_noise
+            print("double noise")
+            print(var_hat_kwargs)
+            var_function = var_hat_func_BO_num_double_noise
         else:
             var_hat_kwargs = {"delta": kwargs["delta"]}
 
@@ -485,10 +508,10 @@ def bayes_optimal_runner(**kwargs):
                     initial_condition = [m, q, sigma]
                     break
 
-            var_function = fpe.var_hat_func_BO_single_noise
+            var_function = var_hat_func_BO_single_noise
 
     alphas, (errors,) = fpe.different_alpha_observables_fpeqs(
-        fpe.var_func_BO,
+        var_func_BO,
         var_function,
         alpha_1=kwargs["alpha_min"],
         alpha_2=kwargs["alpha_max"],
@@ -530,9 +553,9 @@ def reg_param_optimal_runner(**kwargs):
                 break
 
         var_functions = [
-            fpe.var_hat_func_L2_decorrelated_noise,
-            fpe.var_hat_func_L1_decorrelated_noise,
-            fpe.var_hat_func_Huber_decorrelated_noise,
+            var_hat_func_L2_decorrelated_noise,
+            var_hat_func_L1_decorrelated_noise,
+            var_hat_func_Huber_decorrelated_noise,
             -1,
         ]
     else:
@@ -558,9 +581,9 @@ def reg_param_optimal_runner(**kwargs):
                     break
 
             var_functions = [
-                fpe.var_hat_func_L2_double_noise,
-                fpe.var_hat_func_L1_double_noise,
-                fpe.var_hat_func_Huber_double_noise,
+                var_hat_func_L2_double_noise,
+                var_hat_func_L1_double_noise,
+                var_hat_func_Huber_double_noise,
                 -1,
             ]
         else:
@@ -576,9 +599,9 @@ def reg_param_optimal_runner(**kwargs):
                     break
 
             var_functions = [
-                fpe.var_hat_func_L2_single_noise,
-                fpe.var_hat_func_L1_single_noise,
-                fpe.var_hat_func_Huber_single_noise,
+                var_hat_func_L2_single_noise,
+                var_hat_func_L1_single_noise,
+                var_hat_func_Huber_single_noise,
                 -1,
             ]
 
@@ -586,7 +609,7 @@ def reg_param_optimal_runner(**kwargs):
         var_hat_kwargs.update({"a": kwargs["a"]})
 
     alphas, errors, lambdas = optimal_lambda(
-        fpe.var_func_L2,
+        var_func_L2,
         _loss_type_chose(kwargs["loss_name"], values=var_functions),
         alpha_1=kwargs["alpha_min"],
         alpha_2=kwargs["alpha_max"],
@@ -624,18 +647,6 @@ def reg_param_optimal_experiment_runner(**kwargs):
 
     alphas_experimental = alphas_theoretical[idxs]
     lambdas_experimental = lambdas_theoretical[idxs]
-
-    # alphas_idx = alphas_theoretical <= 100
-    # alphas_theoretical = alphas_theoretical[alphas_idx]
-
-    # alphas_experimental = np.append(
-    #     alphas_theoretical[:: n_pts_theoretical // n_pts_experimental],
-    #     alphas_theoretical[-1],
-    # )
-    # lambdas_experimental = np.append(
-    #     lambdas_theoretical[:: n_pts_theoretical // n_pts_experimental],
-    #     lambdas_theoretical[-1],
-    # )
 
     double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
     decorrelated_noise = not (kwargs.get("beta", 1.0) == 1.0)
@@ -730,7 +741,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                 initial_condition = [m, q, sigma]
                 break
 
-        var_hat_func = fpe.var_hat_func_Huber_decorrelated_noise
+        var_hat_func = var_hat_func_Huber_decorrelated_noise
     else:
         if double_noise:
             var_hat_kwargs = {
@@ -753,7 +764,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                     initial_condition = [m, q, sigma]
                     break
 
-            var_hat_func = fpe.var_hat_func_Huber_double_noise
+            var_hat_func = var_hat_func_Huber_double_noise
         else:
             var_hat_kwargs = {"delta": kwargs["delta"]}
             delta = kwargs["delta"]
@@ -766,7 +777,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                     initial_condition = [m, q, sigma]
                     break
 
-            var_hat_func = fpe.var_hat_func_Huber_single_noise
+            var_hat_func = var_hat_func_Huber_single_noise
 
     (
         alphas,
@@ -824,6 +835,8 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
     lambdas_experimental = lambdas_theoretical[idxs]
     huber_params_experimental = huber_params_theoretical[idxs]
 
+    print("max alpha", np.max(alphas_experimental))
+
     double_noise = not float(kwargs.get("percentage", 0.0)) == 0.0
     decorrelated_noise = not (kwargs.get("beta", 1.0) == 1.0)
 
@@ -849,7 +862,7 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
 
     find_coefficients_fun_kwargs = [{"a": a} for a in huber_params_experimental]
 
-    _, errors_mean, errors_std = num.generate_different_alpha(
+    _, errors_mean, errors_std = num.no_parallel_generate_different_alpha(
         error_function,
         num.find_coefficients_Huber,
         alpha_1=kwargs["alpha_min"],

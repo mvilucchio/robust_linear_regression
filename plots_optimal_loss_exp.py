@@ -21,14 +21,14 @@ def integrate_fun_outliers(z, V, omega, delta, mu):
             0.5
             # / np.sqrt(2 * np.pi)
             # * np.exp(-0.5 * z ** 2)
-            * (mu / (1 + mu))
+            # * (mu / (1 + mu))
             * (delta ** mu)
             * np.abs(1 / (np.sqrt(V) * z + omega)) ** (mu + 1.0)
         )
     else:
-        return (
-            0.5 * mu / ((1 + mu) * delta)  # / np.sqrt(2 * np.pi) * np.exp(-0.5 * z ** 2)
-        )  #
+        return 0.0  # return (
+        #     0.5 * mu / ((1 + mu) * delta)  # / np.sqrt(2 * np.pi) * np.exp(-0.5 * z ** 2)
+        # )  #
 
 
 # @vectorize
@@ -46,7 +46,8 @@ def minimize_fun(omega, x, V, eps, delta, mu):
         (1 - eps)
         / np.sqrt(2 * np.pi * (delta + V))
         * np.exp(-0.5 * omega ** 2 / (delta + V))
-        + eps * quad(integrate_fun_outliers, -500, 500, args=(V, omega, delta, mu))[0]
+        + eps
+        * quad(integrate_fun_outliers, -np.inf, np.inf, args=(V, omega, delta, mu))[0]
     )
 
 
@@ -63,7 +64,7 @@ def minimize_fun(omega, x, V, eps, delta, mu):
 
 
 def _minimize_my(x, V, eps, delta, mu):
-    res = minimize(minimize_fun, x0=np.abs(x), args=(x, V, eps, delta, mu), tol=1e-1,)
+    res = minimize(minimize_fun, x0=np.abs(x), args=(x, V, eps, delta, mu), tol=1e-2,)
     if res.success:
         return -res.fun
     else:
@@ -72,34 +73,41 @@ def _minimize_my(x, V, eps, delta, mu):
 
 if __name__ == "__main__":
 
-    eps, V, mu = 0.3, 0.01, 1.5
-    mus = [0.5, 1.5, 2.5]
+    eps, V, mu = 0.1, 0.5, 1.5
+    mus = [0.5]
     epses = [0.01, 0.05, 0.1, 0.3]
     deltas = [0.5, 1.0, 2.0, 5.0, 10.0]
     delta = 5.0
 
-    xs = np.linspace(-30, 30, 300)
+    xs = np.linspace(-50, 50, 20)
 
     # loss_values = np.empty((len(epses), len(xs)))
-    loss_values = np.empty((len(deltas), len(xs)))
+    loss_values = np.empty((len(mus), len(xs)))
 
-    for jdx, d in enumerate(deltas):
-
-        inputs = [(x, V, eps, d, mu) for x in xs]
-
-        with Pool() as pool:
-            results = pool.starmap(_minimize_my, inputs)
+    for jdx, m in enumerate(mus):
+        results = []
+        for x in xs:
+            print(x)
+            results.append(_minimize_my(x, V, eps, delta, m))
 
         for idx, l in enumerate(results):
             loss_values[jdx][idx] = l
 
-    for idx, d in enumerate(deltas):
-        plt.plot(xs, loss_values[jdx], label=r"$\Delta$ = {:.1f}".format(d))
+    for idx, m in enumerate(mus):
+        plt.plot(xs, loss_values[jdx], label=r"$\Delta$ = {:.1f}".format(m))
+
+        # np.savez("dump/powerlaw_different_delta_{}".format(d), x=xs, loss=loss_values[jdx])
 
     # plt.yscale("log")
     # plt.xscale("log")
     plt.legend()
     plt.show()
+
+    # xs = np.linspace(-10, 10, 100)
+    # for mu in [0.5, 1.5, 2.5]:
+    #     plt.plot(xs, integrate_fun_outliers(xs, 0.5, 1.0, 1.0, mu))
+
+    # plt.show()
 
     # xs = np.linspace(-15, 15, 2000)
     # for m in [0.5, 1.5, 2.5, 5.0, 10.0]:

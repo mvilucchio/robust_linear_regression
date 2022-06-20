@@ -7,23 +7,25 @@ if __name__ == "__main__":
     deltas_large = [0.5, 1.0, 2.0, 5.0, 10.0]
     betas = [0.0]
     b = betas[0]
+    percentages = [0.05, 0.1, 0.3]
+    dl = 5.0
 
     experiments_settings = [
         {
             "loss_name": "Huber",
             "alpha_min": 0.01,
-            "alpha_max": 10000,
-            "alpha_pts_theoretical": 150,
+            "alpha_max": 100000,
+            "alpha_pts_theoretical": 100,
             "alpha_pts_experimental": 21,
             "delta_small": delta_small,
             "delta_large": dl,
-            "percentage": percentage,
-            "n_features": 200,
+            "percentage": p,
+            "n_features": 1000,
             "repetitions": 10,
-            "beta": b,
+            # "beta": b,
             "experiment_type": "reg_param huber_param optimal exp",
         }
-        for dl in deltas_large
+        for p in percentages  # for dl in deltas_large  #    # for dl in deltas_large
     ]
 
     for exp_dict in tqdm(experiments_settings):

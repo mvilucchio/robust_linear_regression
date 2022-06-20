@@ -3,15 +3,15 @@ from scipy import optimize
 from numbers import Number
 from sklearn.utils import axis0_safe_slice
 from sklearn.utils.extmath import safe_sparse_dot
-import numba as nb
+from numba import njit
+import cvxpy as cp
+
 from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-# import cvxpy as cp
 
-
-def measure_gen_single(generalization, teacher_vector, xs, delta=1):
+def measure_gen_single(generalization, teacher_vector, xs, delta):
     n_samples, n_features = xs.shape
     w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
     if generalization:
@@ -25,7 +25,7 @@ def measure_gen_single(generalization, teacher_vector, xs, delta=1):
 
 
 def measure_gen_double(
-    generalization, teacher_vector, xs, delta_small=1, delta_large=10, percentage=0.1
+    generalization, teacher_vector, xs, delta_small, delta_large, percentage
 ):
     n_samples, n_features = xs.shape
     w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
@@ -48,13 +48,7 @@ def measure_gen_double(
 
 
 def measure_gen_decorrelated(
-    generalization,
-    teacher_vector,
-    xs,
-    delta_small=1,
-    delta_large=10,
-    percentage=0.1,
-    beta=0.0,
+    generalization, teacher_vector, xs, delta_small, delta_large, percentage, beta
 ):
     n_samples, n_features = xs.shape
     w_xs = np.divide(xs @ teacher_vector, np.sqrt(n_features))
@@ -78,11 +72,7 @@ def measure_gen_decorrelated(
 
 
 def data_generation(
-    measure_fun,
-    n_features=100,
-    n_samples=1000,
-    n_generalization=200,
-    measure_fun_kwargs={"delta_small": 0.1, "delta_large": 2.0, "percentage": 0.1},
+    measure_fun, n_features, n_samples, n_generalization, measure_fun_kwargs
 ):
     theta_0_teacher = np.random.normal(loc=0.0, scale=1.0, size=(n_features,))
 
@@ -133,6 +123,57 @@ def _find_numerical_mean_std(
     del all_gen_errors
 
     return error_mean, error_std
+
+
+def no_parallel_generate_different_alpha(
+    measure_fun,
+    find_coefficients_fun,
+    alpha_1=0.01,
+    alpha_2=100,
+    n_features=100,
+    n_alpha_points=10,
+    repetitions=10,
+    reg_param=1.0,
+    measure_fun_kwargs={"delta_small": 0.1, "delta_large": 10.0, "percentage": 0.1},
+    find_coefficients_fun_kwargs={},
+    alphas=None,
+):
+    if alphas is None:
+        alphas = np.logspace(
+            np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
+        )
+    else:
+        n_alpha_points = len(alphas)
+
+    if isinstance(reg_param, Number):
+        reg_param = reg_param * np.ones_like(alphas)
+
+    if not isinstance(find_coefficients_fun_kwargs, list):
+        find_coefficients_fun_kwargs = [find_coefficients_fun_kwargs] * len(alphas)
+
+    errors_mean = np.empty((n_alpha_points,))
+    errors_std = np.empty((n_alpha_points,))
+
+    results = []
+    for a, rp, fckw in zip(alphas, reg_param, find_coefficients_fun_kwargs):
+        results.append(
+            _find_numerical_mean_std(
+                a,
+                measure_fun,
+                find_coefficients_fun,
+                n_features,
+                repetitions,
+                measure_fun_kwargs,
+                rp,
+                fckw,
+            )
+        )
+
+    for idx, r in enumerate(results):
+        errors_mean[idx] = r[0]
+        errors_std[idx] = r[1]
+
+    return alphas, errors_mean, errors_std
 
 
 def generate_different_alpha(
@@ -189,7 +230,7 @@ def generate_different_alpha(
     return alphas, errors_mean, errors_std
 
 
-@nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def find_coefficients_L2(ys, xs, reg_param):
     _, d = xs.shape
     a = np.divide(xs.T.dot(xs), d) + reg_param * np.identity(d)
@@ -197,7 +238,7 @@ def find_coefficients_L2(ys, xs, reg_param):
     return np.linalg.solve(a, b)
 
 
-# @nb.njit(error_model="numpy", fastmath=True)
+# @njit(error_model="numpy", fastmath=True)
 # def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
 #     linear_loss = ys - xs_norm @ w
 
@@ -254,7 +295,7 @@ def find_coefficients_L1(ys, xs, reg_param):
     return w.value
 
 
-# @nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
     linear_loss = ys - xs_norm @ w
     abs_linear_loss = np.abs(linear_loss)
@@ -312,7 +353,7 @@ def find_coefficients_Huber(ys, xs, reg_param, a=1.0, max_iter=15000, tol=1e-6):
     return opt_res.x
 
 
-# @nb.njit(error_model="numpy", fastmath=True)
+@njit(error_model="numpy", fastmath=True)
 def _loss_and_gradient_cutted_l2(w, xs_norm, ys, reg_param, a):
     linear_loss = ys - xs_norm @ w
     abs_linear_loss = np.abs(linear_loss)
@@ -322,25 +363,26 @@ def _loss_and_gradient_cutted_l2(w, xs_norm, ys, reg_param, a):
     num_outliers = np.count_nonzero(outliers_mask)
     n_non_outliers = xs_norm.shape[0] - num_outliers
 
-    loss = 0.0  # a * np.sum(outliers) - 0.5 * num_outliers * a ** 2
-
     non_outliers = linear_loss[~outliers_mask]
-    loss += 0.5 * np.dot(non_outliers, non_outliers)
+    loss = 0.5 * np.dot(
+        non_outliers, non_outliers
+    )  # 0.0  # a * np.sum(outliers) - 0.5 * num_outliers * a ** 2
     loss += 0.5 * reg_param * np.dot(w, w)
 
     xs_non_outliers = -axis0_safe_slice(xs_norm, ~outliers_mask, n_non_outliers)
-    gradient = safe_sparse_dot(non_outliers, xs_non_outliers)
 
     signed_outliers = np.ones_like(outliers)
     signed_outliers_mask = linear_loss[outliers_mask] < 0
     signed_outliers[signed_outliers_mask] = -1.0
 
-    xs_outliers = axis0_safe_slice(xs_norm, outliers_mask, num_outliers)
+    # xs_outliers = axis0_safe_slice(xs_norm, outliers_mask, num_outliers)
 
     # gradient -= a * safe_sparse_dot(signed_outliers, xs_outliers)
+
+    gradient = safe_sparse_dot(non_outliers, xs_non_outliers)
     gradient += reg_param * w
 
-    return loss  # , gradient
+    return loss, gradient
 
 
 def find_coefficients_cutted_l2(ys, xs, reg_param, a=1.0, max_iter=150, tol=1e-3):
@@ -355,7 +397,7 @@ def find_coefficients_cutted_l2(ys, xs, reg_param, a=1.0, max_iter=150, tol=1e-3
         _loss_and_gradient_cutted_l2,
         w,
         # method="L-BFGS-B",
-        # jac=True,
+        jac=True,
         args=(xs_norm, ys, reg_param, a),
         options={"maxiter": max_iter, "gtol": tol},
         # bounds=bounds,
@@ -363,7 +405,7 @@ def find_coefficients_cutted_l2(ys, xs, reg_param, a=1.0, max_iter=150, tol=1e-3
 
     if opt_res.status == 2:
         raise ValueError(
-            "HuberRegressor convergence failed: l-BFGS-b solver terminated with %s"
+            "Cutted L2 Regressor convergence failed: solver terminated with %s"
             % opt_res.message
         )
 

@@ -5,7 +5,7 @@ from src.fpeqs import (
     var_func_L2,
     var_hat_func_L2_decorrelated_noise,
     var_hat_func_L2_double_noise,
-    var_hat_func_Huber_num_decorrelated_noise,
+    var_hat_func_Huber_decorrelated_noise,
 )
 
 if __name__ == "__main__":
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     alphas, [m, q, sigma] = different_alpha_observables_fpeqs(
         var_func_L2,
-        var_hat_func_Huber_num_decorrelated_noise,
+        var_hat_func_Huber_decorrelated_noise,
         funs=[lambda m, q, sigma: m, lambda m, q, sigma: q, lambda m, q, sigma: sigma],
         alpha_1=0.01,
         alpha_2=100000,
