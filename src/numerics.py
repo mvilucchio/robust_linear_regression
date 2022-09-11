@@ -10,6 +10,9 @@ from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
+BLEND_GAMP = 0.55
+TOL_GAMP = 1e-4
+
 
 def measure_gen_single(generalization, teacher_vector, xs, delta):
     n_samples, n_features = xs.shape
@@ -98,6 +101,7 @@ def _find_numerical_mean_std(
     all_gen_errors = np.empty((repetitions,))
 
     for idx in range(repetitions):
+        print("   ", idx)
         xs, ys, _, _, ground_truth_theta = data_generation(
             measure_fun,
             n_features=n_features,
@@ -155,7 +159,9 @@ def no_parallel_generate_different_alpha(
     errors_std = np.empty((n_alpha_points,))
 
     results = []
+    i = 0
     for a, rp, fckw in zip(alphas, reg_param, find_coefficients_fun_kwargs):
+        print(i)
         results.append(
             _find_numerical_mean_std(
                 a,
@@ -168,6 +174,7 @@ def no_parallel_generate_different_alpha(
                 fckw,
             )
         )
+        i += 1
 
     for idx, r in enumerate(results):
         errors_mean[idx] = r[0]
@@ -222,12 +229,46 @@ def generate_different_alpha(
     with Pool(processes=1) as pool:
         results = pool.starmap(_find_numerical_mean_std, inputs)
 
-    print("---", len(results))
+    #  print("---", len(results))
     for idx, r in enumerate(results):
         errors_mean[idx] = r[0]
         errors_std[idx] = r[1]
 
     return alphas, errors_mean, errors_std
+
+
+@njit(error_model="numpy", fastmath=True)
+def find_coefficients_AMP_single_noise(input_funs, output_funs, ys, xs, *noise_args):
+    _, d = xs.shape
+
+    a_t_1 = np.random.rand(d) + 0.001
+    v_t_1 = np.random.rand(d) + 0.001
+    gout_t_1 = 0.5 * np.random.rand(1) + 0.001
+
+    F = xs / np.sqrt(d)
+    F2 = F ** 2
+
+    err = 1.0
+    while err > TOL_GAMP:
+        V_t = F2 @ v_t_1
+        omega_t = F @ a_t_1 - V_t * gout_t_1
+
+        #  gout_t, Dgout_t = output_functions_single_noise(ys, omega_t, V_t, delta)
+        gout_t, Dgout_t = output_funs(ys, omega_t, V_t, *noise_args)
+
+        sigma_t = -1 / (Dgout_t @ F2)
+        R_t = a_t_1 + sigma_t * (gout_t @ F)
+
+        # a_t, v_t = input_functions_single_noise(R_t, sigma_t)
+        a_t, v_t = input_funs(R_t, sigma_t)
+
+        err = max(np.max(a_t - a_t_1), np.max(v_t - v_t_1))
+
+        a_t_1 = BLEND_GAMP * a_t + (1 - BLEND_GAMP) * a_t_1
+        v_t_1 = BLEND_GAMP * v_t + (1 - BLEND_GAMP) * v_t_1
+        gout_t_1 = BLEND_GAMP * gout_t + (1 - BLEND_GAMP) * gout_t_1
+
+    return a_t, v_t
 
 
 @njit(error_model="numpy", fastmath=True)
@@ -295,7 +336,7 @@ def find_coefficients_L1(ys, xs, reg_param):
     return w.value
 
 
-@njit(error_model="numpy", fastmath=True)
+#  @njit(error_model="numpy", fastmath=True)
 def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
     linear_loss = ys - xs_norm @ w
     abs_linear_loss = np.abs(linear_loss)
@@ -353,7 +394,8 @@ def find_coefficients_Huber(ys, xs, reg_param, a=1.0, max_iter=15000, tol=1e-6):
     return opt_res.x
 
 
-@njit(error_model="numpy", fastmath=True)
+# !!! !!! !!! it lacks the constant value after
+# @njit(error_model="numpy", fastmath=True)
 def _loss_and_gradient_cutted_l2(w, xs_norm, ys, reg_param, a):
     linear_loss = ys - xs_norm @ w
     abs_linear_loss = np.abs(linear_loss)
@@ -406,6 +448,59 @@ def find_coefficients_cutted_l2(ys, xs, reg_param, a=1.0, max_iter=150, tol=1e-3
     if opt_res.status == 2:
         raise ValueError(
             "Cutted L2 Regressor convergence failed: solver terminated with %s"
+            % opt_res.message
+        )
+
+    return opt_res.x
+
+
+#  @njit(error_model="numpy", fastmath=True)
+def _loss_and_gradient_double_quad(w, xs_norm, ys, reg_param, a):
+    linear_loss = ys - xs_norm @ w
+    print("linear loss shape ", linear_loss.shape)
+    linear_loss_squared = (ys - xs_norm @ w) ** 2
+    linear_loss_plus_width = linear_loss_squared + a
+
+    loss = np.sum(
+        0.5 * linear_loss_squared + linear_loss_squared / linear_loss_plus_width
+    ) + 0.5 * reg_param * np.dot(w, w)
+    # gradient = (
+    #     safe_sparse_dot(
+    #         linear_loss + 2 * a * linear_loss / (linear_loss_squared + a) ** 2, xs_norm
+    #     )
+    #     + reg_param * w
+    # )
+    gradient = (
+        safe_sparse_dot(linear_loss, xs_norm)
+        - 2 * safe_sparse_dot(linear_loss / linear_loss_plus_width, xs_norm)
+        + 2 * safe_sparse_dot(linear_loss ** 3 / (linear_loss_plus_width ** 2), xs_norm)
+        + reg_param * w
+    )
+
+    return loss, gradient
+
+
+def find_coefficients_double_quad(ys, xs, reg_param, a=1.0, max_iter=1500, tol=5e-2):
+    _, d = xs.shape
+    w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
+    xs_norm = np.divide(xs, np.sqrt(d))
+
+    bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
+    bounds[-1][0] = np.finfo(np.float64).eps * 10
+
+    opt_res = optimize.minimize(
+        _loss_and_gradient_double_quad,
+        w,
+        # method="L-BFGS-B",
+        jac=True,
+        args=(xs_norm, ys, reg_param, a),
+        options={"maxiter": max_iter, "gtol": tol},
+        # bounds=bounds,
+    )
+
+    if opt_res.status == 2:
+        raise ValueError(
+            "Double Quad Regressor convergence failed: solver terminated with %s"
             % opt_res.message
         )
 
