@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 # from mpi4py import MPI
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-BLEND = 0.9
+BLEND = 0.7
 TOL_FPE = 1e-9
 
 
@@ -53,6 +53,43 @@ def _find_fixed_point(
         var_hat_kwargs=var_hat_kwargs,
     )
     return m, q, sigma
+
+
+def no_parallel_different_alpha_observables_fpeqs_parallel(
+    var_func,
+    var_hat_func,
+    funs=[lambda m, q, sigma: 1 + q - 2 * m],
+    alpha_1=0.01,
+    alpha_2=100,
+    n_alpha_points=16,
+    reg_param=0.1,
+    initial_cond=[0.6, 0.0, 0.0],
+    var_hat_kwargs={},
+):
+    n_observables = len(funs)
+    alphas = np.logspace(
+        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
+    )
+    out_values = np.empty((n_observables, n_alpha_points))
+    results = [None] * len(alphas)
+
+    for idx, (a, r, k) in enumerate(zip(tqdm(alphas), reg_param, var_hat_kwargs)):
+        results[idx] = _find_fixed_point(a, var_func, var_hat_func, r, initial_cond, k)
+    # inputs = [
+    #     (a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs)
+    #     for a in alphas
+    # ]
+
+    # with Pool() as pool:
+    #     results = pool.starmap(_find_fixed_point, inputs)
+
+    for idx, (m, q, sigma) in enumerate(results):
+        fixed_point_sols = {"m": m, "q": q, "sigma": sigma}
+        for jdx, f in enumerate(funs):
+            out_values[jdx, idx] = f(**fixed_point_sols)
+
+    out_list = [out_values[idx, :] for idx in range(len(funs))]
+    return alphas, out_list
 
 
 def no_parallel_different_alpha_observables_fpeqs(

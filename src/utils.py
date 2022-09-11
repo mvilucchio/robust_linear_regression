@@ -60,7 +60,7 @@ REG_EXPS = [
     "((reg[\_\s]{0,1}param|lambda)[\s]{1}(huber[\_\s]{0,1}param)[\_\s]{0,1}optimal)[\_\s]{1}(exp)",
 ]
 
-LOSS_NAMES = ["L2", "L1", "Huber"]
+LOSS_NAMES = ["L2", "L1", "Huber", "DoubleQuad"]
 
 EXPERIMENTAL_FUNCTIONS = []
 
@@ -492,8 +492,7 @@ def bayes_optimal_runner(**kwargs):
                 ):
                     initial_condition = [m, q, sigma]
                     break
-            print("double noise")
-            print(var_hat_kwargs)
+
             var_function = var_hat_func_BO_num_double_noise
         else:
             var_hat_kwargs = {"delta": kwargs["delta"]}
@@ -510,7 +509,7 @@ def bayes_optimal_runner(**kwargs):
 
             var_function = var_hat_func_BO_single_noise
 
-    alphas, (errors,) = fpe.different_alpha_observables_fpeqs(
+    alphas, (errors,) = fpe.no_parallel_different_alpha_observables_fpeqs(
         var_func_BO,
         var_function,
         alpha_1=kwargs["alpha_min"],

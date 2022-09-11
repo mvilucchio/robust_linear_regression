@@ -1,6 +1,11 @@
 import numpy as np
 from scipy.optimize import minimize, Bounds
 import src.fpeqs as fp
+from src.fpeqs_L2 import var_func_L2
+from src.fpeqs_Huber import (
+    var_hat_func_Huber_single_noise,
+    var_hat_func_Huber_double_noise,
+)
 from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
@@ -81,10 +86,10 @@ def _find_optimal_huber_parameter_gen_error(
     def error_func(a):
         var_hat_kwargs.update({"a": a})
         m, q, _ = fp.state_equations(
-            fp.var_func_L2,
-            fp.var_hat_func_Huber_num_double_noise
+            var_func_L2,
+            var_hat_func_Huber_double_noise
             if double_noise
-            else fp.var_hat_func_Huber_num_single_noise,
+            else var_hat_func_Huber_single_noise,
             reg_param=reg_param,
             alpha=alpha,
             init=initial,
@@ -146,7 +151,7 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
         reg_param, a = x
         var_hat_kwargs.update({"a": a})
         m, q, _ = fp.state_equations(
-            fp.var_func_L2,
+            var_func_L2,
             var_hat_func,
             reg_param=reg_param,
             alpha=alpha,
@@ -172,7 +177,7 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
 
 
 def optimal_reg_param_and_huber_parameter(
-    var_hat_func=fp.var_hat_func_Huber_num_double_noise,
+    var_hat_func=var_hat_func_Huber_double_noise,
     alpha_1=0.01,
     alpha_2=100,
     n_alpha_points=16,
@@ -210,7 +215,7 @@ def optimal_reg_param_and_huber_parameter(
 
 
 def no_parallel_optimal_reg_param_and_huber_parameter(
-    var_hat_func=fp.var_hat_func_Huber_num_double_noise,
+    var_hat_func=var_hat_func_Huber_double_noise,
     alpha_1=0.01,
     alpha_2=100,
     n_alpha_points=16,
