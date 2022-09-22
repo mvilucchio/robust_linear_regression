@@ -1,10 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from src.fpeqs import (
-    different_alpha_observables_fpeqs,
+from scipy.special import erf
+from src.fpeqs import different_alpha_observables_fpeqs
+from src.fpeqs_Huber import (
     var_func_L2,
-    var_hat_func_L2_decorrelated_noise,
-    var_hat_func_L2_double_noise,
     var_hat_func_Huber_decorrelated_noise,
 )
 
@@ -12,15 +11,15 @@ if __name__ == "__main__":
 
     delta_small = 0.1
     delta_large = 10.0
-    percentage = 0.1
+    percentage = 0.3
     beta = 0.5
-
+    a = 1.0
     var_hat_kwargs = {
         "delta_small": delta_small,
         "delta_large": delta_large,
         "percentage": percentage,
         "beta": beta,
-        "a": 1.0,
+        "a": a,
     }
 
     while True:
@@ -43,21 +42,30 @@ if __name__ == "__main__":
         var_hat_kwargs=var_hat_kwargs,
     )
 
-    delta_eff = (1 - percentage) * delta_small + percentage * delta_large
-    intermediate_val = 1 + percentage * (beta - 1)
-    mhat = alphas / (1 + sigma) * (1 + percentage * (beta - 1))
-    qhat = (
-        alphas
-        * (
-            1
-            + q
-            + delta_eff
-            + percentage * (beta ** 2 - 1)
-            - 2 * np.abs(m) * intermediate_val
-        )
-        / ((1 + sigma) ** 2)
+    small_sqrt = delta_small - 2 * m + q + 1
+    large_sqrt = delta_large - 2 * m * beta + q + beta ** 2
+    small_erf = (a * (sigma + 1)) / np.sqrt(2 * small_sqrt)
+    large_erf = (a * (sigma + 1)) / np.sqrt(2 * large_sqrt)
+
+    mhat = (alphas / (1 + sigma)) * (
+        (1 - percentage) * erf(small_erf) + beta * percentage * erf(large_erf)
     )
-    sigmahat = alphas / (1 + sigma)
+    qhat = alphas * (
+        a ** 2
+        - (np.sqrt(2 / np.pi) * a / (1 + sigma))
+        * (
+            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
+            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+        )
+        + (1 / (1 + sigma) ** 2)
+        * (
+            (1 - percentage) * (small_sqrt - (a * (1 + sigma)) ** 2) * erf(small_erf)
+            + percentage * (large_sqrt - (a * (1 + sigma)) ** 2) * erf(large_erf)
+        )
+    )
+    sigmahat = (alphas / (1 + sigma)) * (
+        (1 - percentage) * erf(small_erf) + percentage * erf(large_erf)
+    )
 
     plt.plot(alphas, m, label="m")
     plt.plot(alphas, q, label="q")

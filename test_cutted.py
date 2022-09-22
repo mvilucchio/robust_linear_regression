@@ -2,7 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 import src.plotting_utils as pu
-from src.numerics import find_coefficients_cutted_l2, generate_different_alpha
+from src.numerics import (
+    find_coefficients_cutted_l2,
+    generate_different_alpha,
+    no_parallel_generate_different_alpha,
+)
 import src.numerics as num
 from src.utils import (
     check_saved,
@@ -65,23 +69,100 @@ if __name__ == "__main__":
 
     n_exp = len(theory_settings)
 
-    alphas, errors_mean, errors_std = generate_different_alpha(
+    alphas, errors_mean, errors_std = no_parallel_generate_different_alpha(
         num.measure_gen_decorrelated,
-        num.find_coefficients_cutted_l2,
-        alpha_1=0.01,
-        alpha_2=10,
+        num.find_coefficients_double_quad,
+        alpha_1=5,
+        alpha_2=500,
         n_features=200,
-        n_alpha_points=13,
-        repetitions=5,
-        reg_param=0.5,
+        n_alpha_points=4,
+        repetitions=8,
+        reg_param=0.0,
         measure_fun_kwargs={
             "delta_small": 0.1,
             "delta_large": 10.0,
             "percentage": 0.1,
-            "beta": 0.0,
+            "beta": 0.5,
         },
-        find_coefficients_fun_kwargs={"a": 1.0},
+        find_coefficients_fun_kwargs={"a": 0.25},
         alphas=None,
+    )
+
+    np.savez(
+        "./double_quad_loss_beta_{}_eps_{}_dl_{}_ds_{}_rp_{}_a_{}".format(
+            0.5, 0.1, 10.0, 0.1, 0.0, 0.25
+        ),
+        alphas=alphas,
+        errors_mean=errors_mean,
+        errors_std=errors_std,
+    )
+    # dat = np.load(
+    #     "./double_quad_loss_beta_{}_eps_{}_dl_{}_ds_{}.npz".format(0.5, 0.1, 10.0, 0.1)
+    # )
+    # alphas = dat["alphas"]
+    # errors_mean = dat["errors_mean"]
+    # errors_std = dat["errors_std"]
+
+    experiment_runner(
+        **{
+            # "loss_name": "Huber",
+            "alpha_min": 0.01,
+            "alpha_max": 10000,
+            "alpha_pts": 100,
+            #  "reg_param": 0.5,
+            # "delta" : delta_large,
+            "delta_small": 0.1,
+            "delta_large": 10.0,
+            "percentage": 0.3,
+            "beta": 0.5,
+            # "a": 1.0,
+            "experiment_type": "reg_param huber_param optimal",
+        }
+    )
+
+    alp_H, err_H, _, _ = load_file(
+        **{
+            # "loss_name": "Huber",
+            "alpha_min": 0.01,
+            "alpha_max": 10000,
+            "alpha_pts": 100,
+            #  "reg_param": 0.5,
+            # "delta" : delta_large,
+            "delta_small": 0.1,
+            "delta_large": 10.0,
+            "percentage": 0.3,
+            "beta": 0.5,
+            # "a": 1.0,
+            "experiment_type": "reg_param huber_param optimal",
+        }
+    )
+
+    experiment_runner(
+        **{
+            "alpha_min": 0.1,
+            "alpha_max": 1000,
+            "alpha_pts": 50,
+            "reg_param": 0.5,
+            "delta_small": 0.1,
+            "delta_large": 10.0,
+            "percentage": 0.3,
+            "beta": 0.5,
+            "experiment_type": "BO",
+        }
+    )
+
+    alp, er = load_file(
+        **{
+            "alpha_min": 0.1,
+            "alpha_max": 1000,
+            "alpha_pts": 50,
+            "reg_param": 0.5,
+            "delta_small": 0.1,
+            "delta_large": 10.0,
+            "percentage": 0.3,
+            "beta": 0.5,
+            "experiment_type": "BO",
+        }
     )
 
     # ------------
@@ -99,6 +180,8 @@ if __name__ == "__main__":
     # )
 
     ax.errorbar(alphas, errors_mean, errors_std, marker=".", linestyle="None")
+    ax.plot(alp, er, label="BO")
+    ax.plot(alp_H, err_H, label="Huber")
 
     # ax.set_title(
     #     r"{} Loss - $\Delta = [{:.2f}, {:.2f}], \epsilon = {:.2f}$".format(

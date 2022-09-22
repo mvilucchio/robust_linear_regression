@@ -5,10 +5,19 @@ from sklearn.utils import axis0_safe_slice
 from sklearn.utils.extmath import safe_sparse_dot
 from numba import njit
 import cvxpy as cp
+from src.amp_funcs import (
+    input_functions_gaussian_prior,
+    output_functions_decorrelated_noise,
+    output_functions_double_noise,
+    output_functions_single_noise,
+)
 
 from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
+
+MAX_ITER_MINIMIZE = 1500
+GTOL_MINIMIZE = 1e-6
 
 BLEND_GAMP = 0.55
 TOL_GAMP = 1e-4
@@ -75,15 +84,15 @@ def measure_gen_decorrelated(
 
 
 def data_generation(
-    measure_fun, n_features, n_samples, n_generalization, measure_fun_kwargs
+    measure_fun, n_features, n_samples, n_generalization, measure_fun_args
 ):
     theta_0_teacher = np.random.normal(loc=0.0, scale=1.0, size=(n_features,))
 
     xs = np.random.normal(loc=0.0, scale=1.0, size=(n_samples, n_features))
     xs_gen = np.random.normal(loc=0.0, scale=1.0, size=(n_generalization, n_features))
 
-    ys = measure_fun(False, theta_0_teacher, xs, **measure_fun_kwargs)
-    ys_gen = measure_fun(True, theta_0_teacher, xs_gen, **measure_fun_kwargs)
+    ys = measure_fun(False, theta_0_teacher, xs, *measure_fun_args)
+    ys_gen = measure_fun(True, theta_0_teacher, xs_gen, *measure_fun_args)
 
     return xs, ys, xs_gen, ys_gen, theta_0_teacher
 
@@ -94,25 +103,21 @@ def _find_numerical_mean_std(
     find_coefficients_fun,
     n_features,
     repetitions,
-    measure_fun_kwargs,
-    reg_param,
-    find_coefficients_fun_kwargs,
+    measure_fun_args,
+    find_coefficients_fun_args,
 ):
     all_gen_errors = np.empty((repetitions,))
 
     for idx in range(repetitions):
-        print("   ", idx)
         xs, ys, _, _, ground_truth_theta = data_generation(
             measure_fun,
             n_features=n_features,
             n_samples=max(int(np.around(n_features * alpha)), 1),
             n_generalization=1,
-            measure_fun_kwargs=measure_fun_kwargs,
+            measure_fun_args=measure_fun_args,
         )
 
-        estimated_theta = find_coefficients_fun(
-            ys, xs, reg_param, **find_coefficients_fun_kwargs
-        )
+        estimated_theta = find_coefficients_fun(ys, xs, *find_coefficients_fun_args)
 
         all_gen_errors[idx] = np.divide(
             np.sum(np.square(ground_truth_theta - estimated_theta)), n_features
@@ -123,6 +128,7 @@ def _find_numerical_mean_std(
         del ground_truth_theta
 
     error_mean, error_std = np.mean(all_gen_errors), np.std(all_gen_errors)
+    print(alpha, "Done.")
 
     del all_gen_errors
 
@@ -137,9 +143,8 @@ def no_parallel_generate_different_alpha(
     n_features=100,
     n_alpha_points=10,
     repetitions=10,
-    reg_param=1.0,
-    measure_fun_kwargs={"delta_small": 0.1, "delta_large": 10.0, "percentage": 0.1},
-    find_coefficients_fun_kwargs={},
+    measure_fun_args=(),
+    find_coefficients_fun_args={},
     alphas=None,
 ):
     if alphas is None:
@@ -149,19 +154,16 @@ def no_parallel_generate_different_alpha(
     else:
         n_alpha_points = len(alphas)
 
-    if isinstance(reg_param, Number):
-        reg_param = reg_param * np.ones_like(alphas)
-
-    if not isinstance(find_coefficients_fun_kwargs, list):
-        find_coefficients_fun_kwargs = [find_coefficients_fun_kwargs] * len(alphas)
+    if not isinstance(find_coefficients_fun_args, list):
+        find_coefficients_fun_args = [find_coefficients_fun_args] * len(alphas)
 
     errors_mean = np.empty((n_alpha_points,))
     errors_std = np.empty((n_alpha_points,))
 
     results = []
     i = 0
-    for a, rp, fckw in zip(alphas, reg_param, find_coefficients_fun_kwargs):
-        print(i)
+    for a, fckw in zip(alphas, find_coefficients_fun_args):
+        print(i, "/", len(alphas))
         results.append(
             _find_numerical_mean_std(
                 a,
@@ -169,8 +171,7 @@ def no_parallel_generate_different_alpha(
                 find_coefficients_fun,
                 n_features,
                 repetitions,
-                measure_fun_kwargs,
-                rp,
+                measure_fun_args,
                 fckw,
             )
         )
@@ -191,9 +192,8 @@ def generate_different_alpha(
     n_features=100,
     n_alpha_points=10,
     repetitions=10,
-    reg_param=1.0,
-    measure_fun_kwargs={"delta_small": 0.1, "delta_large": 10.0, "percentage": 0.1},
-    find_coefficients_fun_kwargs={},
+    measure_fun_args=(),
+    find_coefficients_fun_args=(),
     alphas=None,
 ):
     if alphas is None:
@@ -203,11 +203,8 @@ def generate_different_alpha(
     else:
         n_alpha_points = len(alphas)
 
-    if isinstance(reg_param, Number):
-        reg_param = reg_param * np.ones_like(alphas)
-
-    if not isinstance(find_coefficients_fun_kwargs, list):
-        find_coefficients_fun_kwargs = [find_coefficients_fun_kwargs] * len(alphas)
+    if not isinstance(find_coefficients_fun_args, list):
+        find_coefficients_fun_args = [find_coefficients_fun_args] * len(alphas)
 
     errors_mean = np.empty((n_alpha_points,))
     errors_std = np.empty((n_alpha_points,))
@@ -219,17 +216,15 @@ def generate_different_alpha(
             find_coefficients_fun,
             n_features,
             repetitions,
-            measure_fun_kwargs,
-            rp,
-            fckw,
+            measure_fun_args,
+            fc_agrs,
         )
-        for a, rp, fckw in zip(alphas, reg_param, find_coefficients_fun_kwargs)
+        for a, fc_agrs in zip(alphas, find_coefficients_fun_args)
     ]
 
-    with Pool(processes=1) as pool:
+    with Pool() as pool:
         results = pool.starmap(_find_numerical_mean_std, inputs)
 
-    #  print("---", len(results))
     for idx, r in enumerate(results):
         errors_mean[idx] = r[0]
         errors_std[idx] = r[1]
@@ -238,11 +233,11 @@ def generate_different_alpha(
 
 
 @njit(error_model="numpy", fastmath=True)
-def find_coefficients_AMP_single_noise(input_funs, output_funs, ys, xs, *noise_args):
+def find_coefficients_AMP(input_funs, output_funs, ys, xs, *noise_args):
     _, d = xs.shape
 
-    a_t_1 = np.random.rand(d) + 0.001
-    v_t_1 = np.random.rand(d) + 0.001
+    a_t_1 = 0.1 * np.random.rand(d) + 0.95
+    v_t_1 = 0.5 * np.random.rand(d) + 0.01
     gout_t_1 = 0.5 * np.random.rand(1) + 0.001
 
     F = xs / np.sqrt(d)
@@ -253,13 +248,11 @@ def find_coefficients_AMP_single_noise(input_funs, output_funs, ys, xs, *noise_a
         V_t = F2 @ v_t_1
         omega_t = F @ a_t_1 - V_t * gout_t_1
 
-        #  gout_t, Dgout_t = output_functions_single_noise(ys, omega_t, V_t, delta)
         gout_t, Dgout_t = output_funs(ys, omega_t, V_t, *noise_args)
 
         sigma_t = -1 / (Dgout_t @ F2)
         R_t = a_t_1 + sigma_t * (gout_t @ F)
 
-        # a_t, v_t = input_functions_single_noise(R_t, sigma_t)
         a_t, v_t = input_funs(R_t, sigma_t)
 
         err = max(np.max(a_t - a_t_1), np.max(v_t - v_t_1))
@@ -268,7 +261,29 @@ def find_coefficients_AMP_single_noise(input_funs, output_funs, ys, xs, *noise_a
         v_t_1 = BLEND_GAMP * v_t + (1 - BLEND_GAMP) * v_t_1
         gout_t_1 = BLEND_GAMP * gout_t + (1 - BLEND_GAMP) * gout_t_1
 
-    return a_t, v_t
+    return a_t  # , v_t
+
+
+def find_coefficients_AMP_single_noise(ys, xs, *noise_args):
+    return find_coefficients_AMP(
+        input_functions_gaussian_prior, output_functions_single_noise, ys, xs, *noise_args
+    )
+
+
+def find_coefficients_AMP_double_noise(ys, xs, *noise_args):
+    return find_coefficients_AMP(
+        input_functions_gaussian_prior, output_functions_double_noise, ys, xs, *noise_args
+    )
+
+
+def find_coefficients_AMP_decorrelated_noise(ys, xs, *noise_args):
+    return find_coefficients_AMP(
+        input_functions_gaussian_prior,
+        output_functions_decorrelated_noise,
+        ys,
+        xs,
+        *noise_args
+    )
 
 
 @njit(error_model="numpy", fastmath=True)
@@ -277,51 +292,6 @@ def find_coefficients_L2(ys, xs, reg_param):
     a = np.divide(xs.T.dot(xs), d) + reg_param * np.identity(d)
     b = np.divide(xs.T.dot(ys), np.sqrt(d))
     return np.linalg.solve(a, b)
-
-
-# @njit(error_model="numpy", fastmath=True)
-# def _loss_and_gradient_L1(w, xs_norm, ys, reg_param):
-#     linear_loss = ys - xs_norm @ w
-
-#     loss = np.sum(np.abs(linear_loss)) + 0.5 * reg_param * np.dot(w, w)
-
-#     sign_sample = np.ones_like(linear_loss)
-#     sign_sample_mask = linear_loss < 0
-#     zero_sample_mask = linear_loss == 0
-#     sign_sample[sign_sample_mask] = -1.0
-#     sign_sample[zero_sample_mask] = 0.0
-
-#     gradient = -safe_sparse_dot(sign_sample, xs_norm)
-#     gradient += reg_param * w
-
-#     return loss, gradient
-
-
-# def find_coefficients_L1(ys, xs, reg_param, max_iter=15000, tol=1e-6):
-#     _, d = xs.shape
-#     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
-#     xs_norm = np.divide(xs, np.sqrt(d))
-
-#     bounds = np.tile([-np.inf, np.inf], (w.shape[0], 1))
-#     bounds[-1][0] = np.finfo(np.float64).eps * 10
-
-#     opt_res = optimize.minimize(
-#         _loss_and_gradient_L1,
-#         w,
-#         method="L-BFGS-B",
-#         jac=True,
-#         args=(xs_norm, ys, reg_param),
-#         options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
-#         bounds=bounds,
-#     )
-
-#     if opt_res.status == 2:
-#         raise ValueError(
-#             "L1Regressor convergence failed: l-BFGS-b solver terminated with %s"
-#             % opt_res.message
-#         )
-
-#     return opt_res.x
 
 
 def find_coefficients_L1(ys, xs, reg_param):
@@ -337,7 +307,7 @@ def find_coefficients_L1(ys, xs, reg_param):
 
 
 #  @njit(error_model="numpy", fastmath=True)
-def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
+def _loss_and_gradient_Huber(w, xs_norm, ys, reg_param, a):
     linear_loss = ys - xs_norm @ w
     abs_linear_loss = np.abs(linear_loss)
     outliers_mask = abs_linear_loss > a
@@ -367,7 +337,7 @@ def _loss_and_gradient_huber(w, xs_norm, ys, reg_param, a):
     return loss, gradient
 
 
-def find_coefficients_Huber(ys, xs, reg_param, a=1.0, max_iter=15000, tol=1e-6):
+def find_coefficients_Huber(ys, xs, reg_param, a):
     _, d = xs.shape
     w = np.random.normal(loc=0.0, scale=1.0, size=(d,))
     xs_norm = np.divide(xs, np.sqrt(d))
@@ -376,12 +346,12 @@ def find_coefficients_Huber(ys, xs, reg_param, a=1.0, max_iter=15000, tol=1e-6):
     bounds[-1][0] = np.finfo(np.float64).eps * 10
 
     opt_res = optimize.minimize(
-        _loss_and_gradient_huber,
+        _loss_and_gradient_Huber,
         w,
         method="L-BFGS-B",
         jac=True,
         args=(xs_norm, ys, reg_param, a),
-        options={"maxiter": max_iter, "gtol": tol, "iprint": -1},
+        options={"maxiter": MAX_ITER_MINIMIZE, "gtol": GTOL_MINIMIZE, "iprint": -1},
         bounds=bounds,
     )
 
@@ -394,6 +364,7 @@ def find_coefficients_Huber(ys, xs, reg_param, a=1.0, max_iter=15000, tol=1e-6):
     return opt_res.x
 
 
+# !!! !!! !!! !!! !!! !!! !!!
 # !!! !!! !!! it lacks the constant value after
 # @njit(error_model="numpy", fastmath=True)
 def _loss_and_gradient_cutted_l2(w, xs_norm, ys, reg_param, a):

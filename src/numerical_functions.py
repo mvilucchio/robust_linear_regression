@@ -1205,44 +1205,44 @@ def hat_equations_numerical_loss_single_noise(
 
 
 def q_hat_equation_BO_double_noise(m, q, sigma, delta_small, delta_large, eps):
-    # borders = find_integration_borders_square(
-    #     lambda y, xi: q_integral_BO_double_noise(
-    #         y, xi, q, m, sigma, delta_small, delta_large, eps
-    #     ),
-    #     np.sqrt((1 + max(delta_small, delta_large))),
-    #     1.0,
-    # )
+    borders = find_integration_borders_square(
+        lambda y, xi: q_integral_BO_double_noise(
+            y, xi, q, m, sigma, delta_small, delta_large, eps
+        ),
+        np.sqrt((1 + max(delta_small, delta_large))),
+        1.0,
+    )
 
-    # args = {"m": m, "q": q, "sigma": sigma}
-    # domain_xi, domain_y = domains_line_constraint(
-    #     borders, border_BO, test_fun_BO, args, args
-    # )
+    args = {"m": m, "q": q, "sigma": sigma}
+    domain_xi, domain_y = domains_line_constraint(
+        borders, border_BO, test_fun_BO, args, args
+    )
 
-    # integral_value = 0.0
-    # for xi_funs, y_funs in zip(domain_xi, domain_y):
-    #     integral_value += dblquad(
-    #         q_integral_BO_double_noise,
-    #         xi_funs[0],
-    #         xi_funs[1],
-    #         y_funs[0],
-    #         y_funs[1],
-    #         args=(q, m, sigma, delta_small, delta_large, eps),
-    #         epsabs=EPSABS,
-    #         epsrel=EPSREL,
-    #     )[0]
+    integral_value = 0.0
+    for xi_funs, y_funs in zip(domain_xi, domain_y):
+        integral_value += dblquad(
+            q_integral_BO_double_noise,
+            xi_funs[0],
+            xi_funs[1],
+            y_funs[0],
+            y_funs[1],
+            args=(q, m, sigma, delta_small, delta_large, eps),
+            epsabs=EPSABS,
+            epsrel=EPSREL,
+        )[0]
 
-    # return integral_value
+    return integral_value
 
-    return dblquad(
-        q_integral_BO_double_noise,
-        -np.inf,
-        np.inf,
-        -np.inf,
-        np.inf,
-        args=(q, m, sigma, delta_small, delta_large, eps),
-        epsabs=EPSABS,
-        epsrel=EPSREL,
-    )[0]
+    # return dblquad(
+    #     q_integral_BO_double_noise,
+    #     -np.inf,
+    #     np.inf,
+    #     -np.inf,
+    #     np.inf,
+    #     args=(q, m, sigma, delta_small, delta_large, eps),
+    #     epsabs=EPSABS,
+    #     epsrel=EPSREL,
+    # )[0]
 
 
 # ------------------
@@ -1555,31 +1555,31 @@ def q_hat_equation_BO_decorrelated_noise(
         1.0,
     )
 
-    # domain_xi, domain_y = divide_integration_borders_grid(borders)
+    domain_xi, domain_y = divide_integration_borders_grid(borders)
 
-    # integral_value = 0.0
-    # for xi_funs, y_funs in zip(domain_xi, domain_y):
-    #     integral_value += dblquad(
-    #         q_integral_BO_decorrelated_noise,
-    #         xi_funs[0],
-    #         xi_funs[1],
-    #         y_funs[0],
-    #         y_funs[1],
-    #         args=(q, m, sigma, delta_small, delta_large, eps, beta),
-    #     )[0]
+    integral_value = 0.0
+    for xi_funs, y_funs in zip(domain_xi, domain_y):
+        integral_value += dblquad(
+            q_integral_BO_decorrelated_noise,
+            xi_funs[0],
+            xi_funs[1],
+            y_funs[0],
+            y_funs[1],
+            args=(q, m, sigma, delta_small, delta_large, eps, beta),
+        )[0]
 
-    # return integral_value
+    return integral_value
 
-    return dblquad(
-        q_integral_BO_decorrelated_noise,
-        borders[0][0],
-        borders[0][1],
-        borders[1][0],
-        borders[1][1],
-        args=(q, m, sigma, delta_small, delta_large, eps, beta),
-        epsabs=EPSABS,
-        epsrel=EPSREL,
-    )[0]
+    # return dblquad(
+    #     q_integral_BO_decorrelated_noise,
+    #     borders[0][0],
+    #     borders[0][1],
+    #     borders[1][0],
+    #     borders[1][1],
+    #     args=(q, m, sigma, delta_small, delta_large, eps, beta),
+    #     epsabs=EPSABS,
+    #     epsrel=EPSREL,
+    # )[0]
 
 
 # ------------------

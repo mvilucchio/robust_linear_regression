@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from itertools import product
 
-save = True
+save = False
 experimental_points = True
 width = 1.0 * 458.63788
+width = 398.3386
 random_number = np.random.randint(100)
 
 marker_cycler = ["*", "s", "P", "P", "v", "D"]
@@ -38,7 +39,7 @@ L2_settings = [
         "delta_small": 0.1,
         "delta_large": dl,
         "percentage": p,
-        # "beta": beta,
+        # "beta": beta,   
         "experiment_type": "reg_param optimal",
     }
     for p in percentages
@@ -412,25 +413,25 @@ ax21.tick_params(axis="y", which="major", pad=5)
 if save:
     pu.save_plot(
         fig,
-        "total_optimal_confronts_fixed_delta_{:.2f}_beta_{:.2f}".format(
+        "presentation_total_optimal_confronts_fixed_delta_{:.2f}_beta_{:.2f}".format(
             dl, betas[index_beta]
         ),
     )
     pu.save_plot(
         fig2,
-        "total_optimal_confronts_params_fixed_delta_{:.2f}_beta_{:.2f}".format(
+        "presentation_total_optimal_confronts_params_fixed_delta_{:.2f}_beta_{:.2f}".format(
             dl, betas[index_beta]
         ),
     )
     pu.save_plot(
         figleg1,
-        "total_optimal_confronts_leg1_fixed_delta_{:.2f}_beta_{:.2f}".format(
+        "presentation_total_optimal_confronts_leg1_fixed_delta_{:.2f}_beta_{:.2f}".format(
             dl, betas[index_beta]
         ),
     )
     pu.save_plot(
         figleg2,
-        "total_optimal_confronts_leg2_fixed_delta_{:.2f}_beta_{:.2f}".format(
+        "presentation_total_optimal_confronts_leg2_fixed_delta_{:.2f}_beta_{:.2f}".format(
             dl, betas[index_beta]
         ),
     )

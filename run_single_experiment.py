@@ -1,5 +1,6 @@
 from src.utils import experiment_runner
 from tqdm.auto import tqdm
+from itertools import product
 
 if __name__ == "__main__":
     percentage, delta_small, delta_large = 0.3, 0.1, 5.0
@@ -27,10 +28,10 @@ if __name__ == "__main__":
             # "a": 1.0,
             # "n_features": 500,
             # "repetitions": 4,
-            # "beta": b,
+            "beta": b,
             "experiment_type": "BO",
         }
-        for p in percentages  # for dl in deltas_large  # reg_params
+        for dl, p in product(deltas_large, percentages)  # reg_params for p in percentages
     ]
 
     for exp_dict in tqdm(experiments_settings):

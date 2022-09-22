@@ -20,9 +20,9 @@ if __name__ == "__main__":
     def get_cmap(n, name="hsv"):
         return plt.cm.get_cmap(name, n)
 
-    loss_name = "L1"
+    loss_name = "Huber"
     delta_small, delta_large, percentage, beta = 0.1, 5.0, 0.1, 0.0
-    reg_params = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 100.0]
+    reg_params = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
 
     experimental_settings = [
         {
