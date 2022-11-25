@@ -12,7 +12,7 @@ if __name__ == "__main__":
     delta_small = 0.1
     delta_large = 10.0
     percentage = 0.3
-    beta = 0.5
+    beta = 0.0
     a = 1.0
     var_hat_kwargs = {
         "delta_small": delta_small,
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     )
 
     small_sqrt = delta_small - 2 * m + q + 1
-    large_sqrt = delta_large - 2 * m * beta + q + beta ** 2
+    large_sqrt = delta_large - 2 * m * beta + q + beta**2
     small_erf = (a * (sigma + 1)) / np.sqrt(2 * small_sqrt)
     large_erf = (a * (sigma + 1)) / np.sqrt(2 * large_sqrt)
 
@@ -51,11 +51,11 @@ if __name__ == "__main__":
         (1 - percentage) * erf(small_erf) + beta * percentage * erf(large_erf)
     )
     qhat = alphas * (
-        a ** 2
+        a**2
         - (np.sqrt(2 / np.pi) * a / (1 + sigma))
         * (
-            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf ** 2))
-            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf ** 2))
+            (1 - percentage) * np.sqrt(small_sqrt) * np.exp(-(small_erf**2))
+            + percentage * np.sqrt(large_sqrt) * np.exp(-(large_erf**2))
         )
         + (1 / (1 + sigma) ** 2)
         * (

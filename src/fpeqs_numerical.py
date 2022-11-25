@@ -10,7 +10,6 @@ def var_hat_func_numerical_loss_single_noise(
     m_int, q_int, sigma_int = numfun.hat_equations_numerical_loss_single_noise(
         m, q, sigma, delta, precompute_proximal_func, loss_args
     )
-    # print("m_int {} q_int {} sigma_int {}".format(m_int, q_int, sigma_int))
     m_hat = alpha * m_int
     q_hat = alpha * q_int
     sigma_hat = -alpha * sigma_int
