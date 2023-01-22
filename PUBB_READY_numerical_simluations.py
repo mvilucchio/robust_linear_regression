@@ -103,8 +103,8 @@ with open(
 n_alphas = len(alphas)
 error_l2_mean = np.empty(n_alphas)
 error_l2_std = np.empty(n_alphas)
-error_l1_mean = np.empty(n_alphas)
-error_l1_std = np.empty(n_alphas)
+# error_l1_mean = np.empty(n_alphas)
+# error_l1_std = np.empty(n_alphas)
 error_hub_mean = np.empty(n_alphas)
 error_hub_std = np.empty(n_alphas)
 
@@ -155,22 +155,22 @@ for idx, (al, regl2, regl1, reg_hub, a_hub) in enumerate(
     )
 
 np.savetxt(
-    "./data/numerics_sweep_alpha_just_l1_fixed_eps_{:.2f}_beta_{:.2f}_delta_large_{:.2f}_delta_small_{:.2f}_dim_{:.2f}.csv".format(
+    "./data/numerics_sweep_alpha_just_l2_hub_fixed_eps_{:.2f}_beta_{:.2f}_delta_large_{:.2f}_delta_small_{:.2f}_dim_{:.2f}.csv".format(
         p, beta, delta_large, delta_small, d
     ),
     np.vstack(
         (
             np.array(alphas),
-            # error_l2_mean,
-            # error_l2_std,
-            error_l1_mean,
-            error_l1_std,
-            # error_hub_mean,
-            # error_hub_std
+            error_l2_mean,
+            error_l2_std,
+            # error_l1_mean,
+            # error_l1_std,
+            error_hub_mean,
+            error_hub_std
         )
     ).T,
     delimiter=",",
-    header="alpha,l1_mean,l1_std",
+    header="alpha,l2_mean,l2_std,hub_mean,hub_std",
 )
 
 print("Done.")
