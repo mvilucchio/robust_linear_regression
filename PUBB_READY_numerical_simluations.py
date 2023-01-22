@@ -83,9 +83,9 @@ reg_param_l1 = []
 reg_param_hub = []
 huber_param = []
 
-beta = 0.0
+beta = 1.0
 with open(
-    "./data/GOOD_sweep_alpha_fixed_eps_0.30_beta_0.00_delta_large_5.00_delta_small.csv", "r"
+    "./data/GOOD_sweep_alpha_fixed_eps_0.30_beta_1.00_delta_large_5.00_delta_small.csv", "r"
 ) as read_obj:
     csv_reader = reader(read_obj)
     for idx, row in enumerate(csv_reader):
