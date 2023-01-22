@@ -1,4 +1,4 @@
-from src.utils import experiment_runner
+from src.utils import experiment_runner, reg_param_optimal_runner, bayes_optimal_runner
 from tqdm.auto import tqdm
 
 if __name__ == "__main__":
@@ -19,11 +19,12 @@ if __name__ == "__main__":
             "delta_small": delta_small,
             "delta_large": dl,
             "percentage": p,
-            # "beta": b,
-            "experiment_type": "reg_param optimal",
+            "beta": b,
+            # "experiment_type": "reg_param optimal",
+            "experiment_type": "BO",
         }
-        for p in percentages  # for dl in deltas_large  # reg_params
+        for p in percentages
     ]
 
     for exp_dict in tqdm(experiments_settings):
-        experiment_runner(**exp_dict)
+        bayes_optimal_runner(**exp_dict)

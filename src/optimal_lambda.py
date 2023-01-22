@@ -10,8 +10,8 @@ from multiprocessing import Pool
 
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-SMALLEST_REG_PARAM = 1e-5
-SMALLEST_HUBER_PARAM = 1e-5
+SMALLEST_REG_PARAM = 1e-7
+SMALLEST_HUBER_PARAM = 1e-7
 MAX_ITER = 2500
 XATOL = 1e-8
 FATOL = 1e-8
@@ -231,8 +231,8 @@ def no_parallel_optimal_reg_param_and_huber_parameter(
     reg_param_opt = np.zeros(n_alpha_points)
     a_opt = np.zeros(n_alpha_points)
 
-    inital_reg_param = 0.2 * np.random.random() + 0.9
-    inital_hub_param = 0.2 * np.random.random() + 0.9
+    inital_reg_param = 0.001 * np.random.random() + 0.001
+    inital_hub_param = 0.001 * np.random.random() + 0.001
 
     inputs = [
         (a, var_hat_func, initial, var_hat_kwargs, [inital_reg_param, inital_hub_param])

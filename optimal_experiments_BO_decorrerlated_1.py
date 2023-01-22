@@ -1,41 +1,36 @@
-from src.utils import experiment_runner, load_file
+from src.utils import experiment_runner, load_file, bayes_optimal_runner
 from tqdm.auto import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 import src.fpeqs as fpe
-from src.fpeqs_BO import var_func_BO, var_hat_func_BO_num_double_noise
+from src.fpeqs_BO import var_func_BO, var_hat_func_BO_num_double_noise,var_hat_func_BO_num_decorrelated_noise
 
 
 if __name__ == "__main__":
-    percentage, delta_small, delta_large = 0.1, 0.1, 5.0
+    percentage, delta_small, delta_large = 0.3, 0.1, 5.0
 
     deltas_large = [0.5, 1.0, 5.0, 10.0]
-    betas = [0.0]
-    b = betas[0]
+    b = 0.0
     percentages = [0.05, 0.1, 0.3]
-    # dl = 5.0
+    dl = 5.0
     p = 0.1
 
-    experiments_settings = [
-        {
-            # "loss_name": "Huber",
+    experiments_settings = {
             "alpha_min": 0.01,
             "alpha_max": 100,
-            "alpha_pts": 30,
+            "alpha_pts": 10,
             "delta_small": delta_small,
             "delta_large": dl,
             "percentage": p,
-            # "beta": b,
+            "beta": b,
             "experiment_type": "BO",
         }
-        for dl in deltas_large  # for p in percentages  # for dl in deltas_large  #    # for dl in deltas_large
-    ]
 
     alpha = []
     errors = []
 
-    ls = [0.5, 1.0, 2.0, 5.0, 10.0]
+    ls = [5.0, 10.0]
     for dl in tqdm(ls):
 
         while True:
@@ -48,7 +43,7 @@ if __name__ == "__main__":
 
         alphas_double, (errors_double,) = fpe.different_alpha_observables_fpeqs(
             var_func_BO,
-            var_hat_func_BO_num_double_noise,
+            var_hat_func_BO_num_decorrelated_noise,
             alpha_1=0.01,
             alpha_2=100,
             n_alpha_points=32,
@@ -57,6 +52,7 @@ if __name__ == "__main__":
                 "delta_small": delta_small,
                 "delta_large": dl,
                 "percentage": p,
+                "beta": 0.0,
             },
         )
         alpha.append(alphas_double)

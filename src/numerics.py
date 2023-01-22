@@ -116,7 +116,8 @@ def _find_numerical_mean_std(
             n_generalization=1,
             measure_fun_args=measure_fun_args,
         )
-
+        
+        print(xs.shape, ys.shape)
         estimated_theta = find_coefficients_fun(ys, xs, *find_coefficients_fun_args)
 
         all_gen_errors[idx] = np.divide(

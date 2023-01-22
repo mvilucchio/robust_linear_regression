@@ -37,18 +37,30 @@ def _get_spaced_index(array, num_elems, max_val=100):
     return np.round(np.linspace(0, len(array[cond_array]) - 1, num_elems)).astype(int)
 
 
-DATA_FOLDER_PATH = "/Users/matteovilucchio/Documents/ENS/HProblem/robust_linear_regression/data"  # "./data"  # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  #
+DATA_FOLDER_PATH = "./" # "/Volumes/LaCie/final_data_hproblem/"  # "/Users/matteovilucchio/Documents/ENS/HProblem/robust_linear_regression/data"  # "./data"  # "/Volumes/LaCie/final_data_hproblem" #  # "/Volumes/LaCie/final_data_hproblem" #  #  #
+
+CSV_FOLDER_PATHS = [
+    "./data/csv/experiments",
+    "./data/csv/GAMP_experiments",
+    "./data/csv/theory",
+    "./data/csv/bayes_optimal",
+    "./data/csv/reg_param_optimal",
+    "./data/csv/reg_param_optimal_experimental",
+    "./data/csv/reg_and_huber_param_optimal",
+    "./data/csv/reg_and_huber_param_optimal_experimental",
+    "./data/csv/others",
+]
 
 FOLDER_PATHS = [
-    "./data/experiments",
-    "./data/GAMP_experiments",
-    "./data/theory",
-    "./data/bayes_optimal",
-    "./data/reg_param_optimal",
-    "./data/reg_param_optimal_experimental",
-    "./data/reg_and_huber_param_optimal",
-    "./data/reg_and_huber_param_optimal_experimental",
-    "./data/others",
+    "data/experiments/",
+    "data/GAMP_experiments/",
+    "data/theory/",
+    "data/bayes_optimal/",
+    "data/reg_param_optimal/",
+    "data/reg_param_optimal_experimental/",
+    "data/reg_and_huber_param_optimal/",
+    "data/reg_and_huber_param_optimal_experimental/",
+    "data/others/",
 ]
 
 REG_EXPS = [
@@ -123,10 +135,7 @@ def file_name_generator(**kwargs):
     experiment_code = _exp_type_choser(kwargs["experiment_type"])
 
     if not (
-        experiment_code == 1
-        or experiment_code == 3
-        or experiment_code == 6
-        or experiment_code == 7
+        experiment_code == 1 or experiment_code == 3 or experiment_code == 6 or experiment_code == 7
     ):
         if kwargs["loss_name"] == "Huber":
             kwargs["loss_name"] += " " + str(kwargs.get("a", 1.0))
@@ -170,9 +179,7 @@ def save_file(**kwargs):
     print(experiment_code)
 
     if file_path is None:
-        file_path = os.path.join(
-            FOLDER_PATHS[experiment_code], file_name_generator(**kwargs)
-        )
+        file_path = os.path.join(FOLDER_PATHS[experiment_code], file_name_generator(**kwargs))
 
     if experiment_code == 0 or experiment_code == 1:
         np.savez(
@@ -224,7 +231,7 @@ def load_file(**kwargs):
 
     experiment_code = _exp_type_choser(kwargs["experiment_type"])
     print(experiment_code)
-    
+
     if file_path is None:
         file_path = os.path.join(
             FOLDER_PATHS[experiment_code], file_name_generator(**kwargs) + ".npz"
@@ -267,6 +274,101 @@ def load_file(**kwargs):
         lambdas = saved_data["lambdas"]
         huber_params = saved_data["huber_params"]
         return alphas, errors_mean, errors_std, lambdas, huber_params
+    else:
+        raise ValueError("experiment_type not recognized.")
+
+
+def npz_to_csv_converter(**kwargs):
+    file_path = kwargs.get("file_path")
+
+    experiment_code = _exp_type_choser(kwargs["experiment_type"])
+
+    if file_path is None:
+        file_path = os.path.join(
+            DATA_FOLDER_PATH, FOLDER_PATHS[experiment_code], file_name_generator(**kwargs) + ".npz"
+        )
+
+    csv_file_path = os.path.join(
+        CSV_FOLDER_PATHS[experiment_code], file_name_generator(**kwargs) + ".csv"
+    )
+
+    saved_data = np.load(file_path)
+
+    if experiment_code == 0 or experiment_code == 1:
+        alphas = saved_data["alphas"]
+        errors_mean = saved_data["errors_mean"]
+        errors_std = saved_data["errors_std"]
+
+        np.savetxt(
+            csv_file_path,
+            np.stack((alphas, errors_mean, errors_std)).T,
+            header="alphas,errors-mean,errors-std",
+            delimiter=",",
+            comments="",
+        )
+    elif experiment_code == 2 or experiment_code == 3:
+        alphas = saved_data["alphas"]
+        errors = saved_data["errors"]
+
+        np.savetxt(
+            csv_file_path,
+            np.stack((alphas, errors)).T,
+            header="alphas,errors",
+            delimiter=",",
+            comments="",
+        )
+    elif experiment_code == 4:
+        alphas = saved_data["alphas"]
+        errors = saved_data["errors"]
+        lambdas = saved_data["lambdas"]
+
+        np.savetxt(
+            csv_file_path,
+            np.stack((alphas, errors, lambdas)).T,
+            header="alphas,errors,lambdas",
+            delimiter=",",
+            comments="",
+        )
+    elif experiment_code == 5:
+        alphas = saved_data["alphas"]
+        errors_mean = saved_data["errors_mean"]
+        errors_std = saved_data["errors_std"]
+        lambdas = saved_data["lambdas"]
+
+        np.savetxt(
+            csv_file_path,
+            np.stack((alphas, errors_mean, errors_std, lambdas)).T,
+            header="alphas,errors-mean,errors-std,lambdas",
+            delimiter=",",
+            comments="",
+        )
+    elif experiment_code == 6:
+        alphas = saved_data["alphas"]
+        errors = saved_data["errors"]
+        lambdas = saved_data["lambdas"]
+        huber_params = saved_data["huber_params"]
+
+        np.savetxt(
+            csv_file_path,
+            np.stack((alphas, errors, lambdas, huber_params)).T,
+            header="alphas,errors,lambdas,huber-params",
+            delimiter=",",
+            comments="",
+        )
+    elif experiment_code == 7:
+        alphas = saved_data["alphas"]
+        errors_mean = saved_data["errors_mean"]
+        errors_std = saved_data["errors_std"]
+        lambdas = saved_data["lambdas"]
+        huber_params = saved_data["huber_params"]
+
+        np.savetxt(
+            csv_file_path,
+            np.stack((alphas, errors_mean, errors_std, lambdas, huber_params)).T,
+            header="alphas,errors-mean,errors-std,lambdas,huber-params",
+            delimiter=",",
+            comments="",
+        )
     else:
         raise ValueError("experiment_type not recognized.")
 
@@ -469,10 +571,7 @@ def theory_curve_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if (
-                    np.square(m) < q + delta_small * q
-                    and np.square(m) < q + delta_large * q
-                ):
+                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
                     initial_condition = [m, q, sigma]
                     break
 
@@ -517,7 +616,11 @@ def theory_curve_runner(**kwargs):
     )
 
     kwargs.update(
-        {"file_path": file_path, "alphas": alphas, "errors": errors,}
+        {
+            "file_path": file_path,
+            "alphas": alphas,
+            "errors": errors,
+        }
     )
 
     save_file(**kwargs)
@@ -564,10 +667,7 @@ def bayes_optimal_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if (
-                    np.square(m) < q + delta_small * q
-                    and np.square(m) < q + delta_large * q
-                ):
+                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
                     initial_condition = [m, q, sigma]
                     break
 
@@ -587,7 +687,7 @@ def bayes_optimal_runner(**kwargs):
 
             var_function = var_hat_func_BO_single_noise
 
-    alphas, (errors,) = fpe.different_alpha_observables_fpeqs(
+    alphas, (errors,) = fpe.no_parallel_different_alpha_observables_fpeqs(
         var_func_BO,
         var_function,
         alpha_1=kwargs["alpha_min"],
@@ -597,8 +697,14 @@ def bayes_optimal_runner(**kwargs):
         var_hat_kwargs=var_hat_kwargs,
     )
 
+    print(errors)
+
     kwargs.update(
-        {"file_path": file_path, "alphas": alphas, "errors": errors,}
+        {
+            "file_path": file_path,
+            "alphas": alphas,
+            "errors": errors,
+        }
     )
 
     save_file(**kwargs)
@@ -650,10 +756,7 @@ def reg_param_optimal_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if (
-                    np.square(m) < q + delta_small * q
-                    and np.square(m) < q + delta_large * q
-                ):
+                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
                     initial_condition = [m, q, sigma]
                     break
 
@@ -696,7 +799,12 @@ def reg_param_optimal_runner(**kwargs):
     )
 
     kwargs.update(
-        {"file_path": file_path, "alphas": alphas, "errors": errors, "lambdas": lambdas,}
+        {
+            "file_path": file_path,
+            "alphas": alphas,
+            "errors": errors,
+            "lambdas": lambdas,
+        }
     )
 
     save_file(**kwargs)
@@ -708,7 +816,10 @@ def reg_param_optimal_experiment_runner(**kwargs):
 
     theoretical_exp_dict = kwargs.copy()
     theoretical_exp_dict.update(
-        {"experiment_type": "reg_param optimal", "alpha_pts": n_pts_theoretical,}
+        {
+            "experiment_type": "reg_param optimal",
+            "alpha_pts": n_pts_theoretical,
+        }
     )
     file_exists, file_path = check_saved(**theoretical_exp_dict)
 
@@ -716,7 +827,9 @@ def reg_param_optimal_experiment_runner(**kwargs):
         raise RuntimeError("The file corresponding to the experiment do not exists.")
 
     theoretical_exp_dict.update(
-        {"file_path": file_path,}
+        {
+            "file_path": file_path,
+        }
     )
     alphas_theoretical, _, lambdas_theoretical = load_file(**theoretical_exp_dict)
 
@@ -775,7 +888,9 @@ def reg_param_optimal_experiment_runner(**kwargs):
     )
 
     kwargs.update(
-        {"alpha_pts": n_pts_experimental,}
+        {
+            "alpha_pts": n_pts_experimental,
+        }
     )
 
     _, file_path = check_saved(**kwargs)
@@ -834,10 +949,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
                 m = 0.89 * np.random.random() + 0.1
                 q = 0.89 * np.random.random() + 0.1
                 sigma = 0.89 * np.random.random() + 0.1
-                if (
-                    np.square(m) < q + delta_small * q
-                    and np.square(m) < q + delta_large * q
-                ):
+                if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
                     initial_condition = [m, q, sigma]
                     break
 
@@ -856,12 +968,7 @@ def reg_param_and_huber_param_optimal_runner(**kwargs):
 
             var_hat_func = var_hat_func_Huber_single_noise
 
-    (
-        alphas,
-        errors,
-        lambdas,
-        huber_params,
-    ) = no_parallel_optimal_reg_param_and_huber_parameter(
+    (alphas, errors, lambdas, huber_params,) = no_parallel_optimal_reg_param_and_huber_parameter(
         var_hat_func=var_hat_func,
         alpha_1=kwargs["alpha_min"],
         alpha_2=kwargs["alpha_max"],
@@ -900,7 +1007,9 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
         raise RuntimeError("The file corresponding to the experiment do not exists.")
 
     theoretical_exp_dict.update(
-        {"file_path": file_path,}
+        {
+            "file_path": file_path,
+        }
     )
 
     alphas_theoretical, _, lambdas_theoretical, huber_params_theoretical = load_file(
@@ -954,7 +1063,9 @@ def reg_param_and_huber_param_experimental_optimal_runner(**kwargs):
     )
 
     kwargs.update(
-        {"alpha_pts": n_pts_experimental,}
+        {
+            "alpha_pts": n_pts_experimental,
+        }
     )
 
     _, file_path = check_saved(**kwargs)

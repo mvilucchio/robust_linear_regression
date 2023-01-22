@@ -10,21 +10,24 @@ from tqdm.auto import tqdm
 # from mpi4py import MPI
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
-BLEND = 0.7
-TOL_FPE = 1e-9
+BLEND = 0.75
+TOL_FPE = 1e-10
 
 
 def state_equations(var_func, var_hat_func, reg_param, alpha, init, var_hat_kwargs):
     m, q, sigma = init[0], init[1], init[2]
+    # print("-- ", type(m), type(q), type(sigma), type(reg_param))
     err = 1.0
-
+    reg_param = float(reg_param)
     #  print("alpha : {:.3f} a : {:.9f} reg_par : {:.7f}".format(alpha, var_hat_kwargs["a"], reg_param))
     while err > TOL_FPE:
         m_hat, q_hat, sigma_hat = var_hat_func(m, q, sigma, alpha, **var_hat_kwargs)
+        # print("after first ", type(m_hat), type(q_hat), type(sigma_hat))
 
         temp_m, temp_q, temp_sigma = m, q, sigma
-
+        # print("after second ",type(temp_m), type(temp_q), type(temp_sigma))
         m, q, sigma = var_func(m_hat, q_hat, sigma_hat, reg_param)
+        # print("after third ",type(m), type(q), type(sigma))
 
         err = np.max(np.abs([(temp_m - m), (temp_q - q), (temp_sigma - sigma)]))
 
@@ -41,9 +44,7 @@ def state_equations(var_func, var_hat_func, reg_param, alpha, init, var_hat_kwar
     return m, q, sigma
 
 
-def _find_fixed_point(
-    alpha, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs
-):
+def _find_fixed_point(alpha, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs):
     m, q, sigma = state_equations(
         var_func,
         var_hat_func,
@@ -67,9 +68,7 @@ def no_parallel_different_alpha_observables_fpeqs_parallel(
     var_hat_kwargs={},
 ):
     n_observables = len(funs)
-    alphas = np.logspace(
-        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
-    )
+    alphas = np.logspace(np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points)
     out_values = np.empty((n_observables, n_alpha_points))
     results = [None] * len(alphas)
 
@@ -104,9 +103,7 @@ def no_parallel_different_alpha_observables_fpeqs(
     var_hat_kwargs={},
 ):
     n_observables = len(funs)
-    alphas = np.logspace(
-        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
-    )
+    alphas = np.logspace(np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points)
     out_values = np.empty((n_observables, n_alpha_points))
     results = [None] * len(alphas)
 
@@ -114,13 +111,6 @@ def no_parallel_different_alpha_observables_fpeqs(
         results[idx] = _find_fixed_point(
             a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs
         )
-    # inputs = [
-    #     (a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs)
-    #     for a in alphas
-    # ]
-
-    # with Pool() as pool:
-    #     results = pool.starmap(_find_fixed_point, inputs)
 
     for idx, (m, q, sigma) in enumerate(results):
         fixed_point_sols = {"m": m, "q": q, "sigma": sigma}
@@ -147,9 +137,7 @@ def MPI_different_alpha_observables_fpeqs(
     pool_size = comm.Get_size()
 
     n_observables = len(funs)
-    alphas = np.logspace(
-        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), pool_size
-    )
+    alphas = np.logspace(np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), pool_size)
     alpha = alphas[i]
     out_values = np.empty((n_observables, n_alpha_points))
 
@@ -199,15 +187,10 @@ def different_alpha_observables_fpeqs(
     var_hat_kwargs={},
 ):
     n_observables = len(funs)
-    alphas = np.logspace(
-        np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points
-    )
+    alphas = np.logspace(np.log(alpha_1) / np.log(10), np.log(alpha_2) / np.log(10), n_alpha_points)
     out_values = np.empty((n_observables, n_alpha_points))
 
-    inputs = [
-        (a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs)
-        for a in alphas
-    ]
+    inputs = [(a, var_func, var_hat_func, reg_param, initial_cond, var_hat_kwargs) for a in alphas]
 
     with Pool() as pool:
         results = pool.starmap(_find_fixed_point, inputs)
@@ -241,8 +224,7 @@ def different_reg_param_gen_error(
     out_values = np.empty((n_observables, n_reg_param_points))
 
     inputs = [
-        (alpha, var_func, var_hat_func, rp, initial_cond, var_hat_kwargs)
-        for rp in reg_params
+        (alpha, var_func, var_hat_func, rp, initial_cond, var_hat_kwargs) for rp in reg_params
     ]
 
     with Pool() as pool:

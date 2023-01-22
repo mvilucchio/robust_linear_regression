@@ -2,7 +2,7 @@ import os
 import datetime as dt
 import matplotlib.pyplot as plt
 
-IMG_DIRECTORY = "/Volumes/LaCie/final_imgs_hproblem/new3/new5"  #  "./imgs" #  #  # "/Volumes/LaCie/final_imgs_hproblem" #
+IMG_DIRECTORY = "./imgs" # "/Volumes/LaCie/final_imgs_hproblem/new3/new5"  #  "./imgs" #  #  # "/Volumes/LaCie/final_imgs_hproblem" #
 STYLES_DIRECTORY = "./src/mpl_styles"
 
 

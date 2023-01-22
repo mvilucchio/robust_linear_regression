@@ -11,11 +11,12 @@ from src.integration_utils import (
     precompute_values_double_romb_integration,
     romberg_linspace,
     domains_line_constraint,
+    divide_integration_borders_multiple_grid
 )
 
-MULT_INTEGRAL = 20
-EPSABS = 1e-11
-EPSREL = 1e-11
+MULT_INTEGRAL = 9
+EPSABS = 1e-8
+EPSREL = 1e-8
 
 
 @njit(error_model="numpy", fastmath=True)
@@ -243,36 +244,36 @@ def _foutBayes_decorrelated_noise_erm(
 
 @njit(error_model="numpy", fastmath=True)
 def foutBayes_decorrelated_noise(y, omega, V, delta_small, delta_large, eps, beta):
-    # small_exponential = np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
-    # large_exponential = np.exp(
-    #     -((y - beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
-    # )
-    # return (
-    #     (y - omega) * (1 - eps) * small_exponential / np.power(V + delta_small, 3 / 2)
-    #     + eps
-    #     * beta
-    #     * (y - beta * omega)
-    #     * large_exponential
-    #     / np.power(beta ** 2 * V + delta_large, 3 / 2)
-    # ) / (
-    #     (1 - eps) * small_exponential / np.power(V + delta_small, 1 / 2)
-    #     + eps * large_exponential / np.power(beta ** 2 * V + delta_large, 1 / 2)
-    # )
-    exponential = np.exp(
-        ((y - omega) ** 2) / (2 * (V + delta_small))
-        - ((y - beta * omega) ** 2) / (2 * ((beta ** 2) * V + delta_large))
+    small_exponential = np.exp(-((y - omega) ** 2) / (2 * (V + delta_small)))
+    large_exponential = np.exp(
+        -((y - beta * omega) ** 2) / (2 * (beta ** 2 * V + delta_large))
     )
     return (
-        (y - omega)
-        * (
-            (1 - eps) / np.sqrt((V + delta_small) ** 3)
-            + eps * exponential / np.sqrt(((beta ** 2) * V + delta_large) ** 3)
-        )
-        / (
-            (1 - eps) / np.sqrt(V + delta_small)
-            + eps * exponential / np.sqrt((beta ** 2) * V + delta_large)
-        )
+        (y - omega) * (1 - eps) * small_exponential / np.power(V + delta_small, 3 / 2)
+        + eps
+        * beta
+        * (y - beta * omega)
+        * large_exponential
+        / np.power(beta ** 2 * V + delta_large, 3 / 2)
+    ) / (
+        (1 - eps) * small_exponential / np.power(V + delta_small, 1 / 2)
+        + eps * large_exponential / np.power(beta ** 2 * V + delta_large, 1 / 2)
     )
+    # exponential = np.exp(
+    #     ((y - omega) ** 2) / (2 * (V + delta_small))
+    #     - ((y - beta * omega) ** 2) / (2 * ((beta ** 2) * V + delta_large))
+    # )
+    # return (
+    #     (y - omega)
+    #     * (
+    #         (1 - eps) / np.sqrt((V + delta_small) ** 3)
+    #         + eps * exponential / np.sqrt(((beta ** 2) * V + delta_large) ** 3)
+    #     )
+    #     / (
+    #         (1 - eps) / np.sqrt(V + delta_small)
+    #         + eps * exponential / np.sqrt((beta ** 2) * V + delta_large)
+    #     )
+    # )
 
 
 # -------
@@ -1555,7 +1556,27 @@ def q_hat_equation_BO_decorrelated_noise(
         1.0,
     )
 
-    domain_xi, domain_y = divide_integration_borders_grid(borders)
+    # print(borders[0][0], m,q,sigma, " - ", delta_small, delta_large, eps, beta)
+
+    # args = {"m": m, "q": q, "sigma": sigma}
+    # domain_xi, domain_y = domains_line_constraint(
+    #     borders, border_BO, test_fun_BO, args, args
+    # )
+    if delta_large <= 0.11 * delta_small:
+        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=50)
+    elif delta_large <= 0.5 * delta_small:
+        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=40)
+    elif delta_large <= delta_small:
+        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=30)
+    else: # delta_large <= delta_small:
+        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=3)
+    # else:
+    #     args = {"m": m, "q": q, "sigma": sigma}
+    #     domain_xi, domain_y = domains_line_constraint(
+    #         borders, border_BO, test_fun_BO, args, args
+    #     )
+
+    print(len(domain_xi))
 
     integral_value = 0.0
     for xi_funs, y_funs in zip(domain_xi, domain_y):

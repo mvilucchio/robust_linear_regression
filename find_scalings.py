@@ -6,20 +6,28 @@ from src.fpeqs_Huber import (
     var_func_L2,
     var_hat_func_Huber_decorrelated_noise,
 )
+from src.fpeqs_L1 import (
+    # var_func_L2,
+    var_hat_func_L1_decorrelated_noise,
+)
+from src.fpeqs_L2 import (
+    # var_func_L2,
+    var_hat_func_L2_decorrelated_noise,
+)
 
 if __name__ == "__main__":
 
     delta_small = 0.1
     delta_large = 10.0
-    percentage = 0.3
+    percentage = 0.1
     beta = 0.0
-    a = 1.0
+    a = 1
     var_hat_kwargs = {
         "delta_small": delta_small,
         "delta_large": delta_large,
         "percentage": percentage,
         "beta": beta,
-        "a": a,
+        # "a": a,
     }
 
     while True:
@@ -32,7 +40,7 @@ if __name__ == "__main__":
 
     alphas, [m, q, sigma] = different_alpha_observables_fpeqs(
         var_func_L2,
-        var_hat_func_Huber_decorrelated_noise,
+        var_hat_func_L2_decorrelated_noise,
         funs=[lambda m, q, sigma: m, lambda m, q, sigma: q, lambda m, q, sigma: sigma],
         alpha_1=0.01,
         alpha_2=100000,
@@ -73,9 +81,15 @@ if __name__ == "__main__":
     plt.plot(alphas, mhat, label="mhat")
     plt.plot(alphas, qhat, label="qhat")
     plt.plot(alphas, sigmahat, label="sigmahat")
+    plt.plot(alphas, (sigma+1)/np.sqrt(2*(delta_small + 1 +q -2*m)), label="aaa")
     plt.xscale("log")
     plt.yscale("log")
+    # plt.ylim([0.5, 1.5])
     plt.grid()
     plt.legend()
+    plt.annotate("{:.3f}".format(m[-1]), (10**4, m[-1]))
+    plt.annotate("{:.3f}".format(q[-1]), (10**4, q[-1]))
+
+    print(1-percentage, m[-1],q[-1], sigma[-1])
 
     plt.show()
