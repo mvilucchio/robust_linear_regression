@@ -57,7 +57,7 @@ delta_large = 5.0
 p = 0.3
 delta_small = 1.0
 
-d = 1000
+d = 50
 
 # figleg1 = plt.figure(figsize=(tuple_size[0], tuple_size[1] / 17))
 # figleg2 = plt.figure(figsize=(tuple_size[0], tuple_size[1] / 17))
@@ -83,16 +83,19 @@ reg_param_l1 = []
 reg_param_hub = []
 huber_param = []
 
-beta = 1.0
+lower_bound = 100
+upper_bound = 300
+
+beta = 0.0
 with open(
-    "./data/GOOD_sweep_alpha_fixed_eps_0.30_beta_1.00_delta_large_5.00_delta_small.csv", "r"
+    "./data/GOOD_sweep_alpha_fixed_eps_0.30_beta_0.00_delta_large_5.00_delta_small.csv", "r"
 ) as read_obj:
     csv_reader = reader(read_obj)
     for idx, row in enumerate(csv_reader):
         if idx == 0:
             continue
 
-        if float(row[0]) <= 1000 and idx % 3 == 0:
+        if float(row[0]) <= upper_bound and float(row[0]) >= lower_bound and idx % 3 == 0:
             alphas.append(float(row[0]))
             reg_param_l2.append(float(row[2]))
             reg_param_l1.append(float(row[4]))
@@ -103,8 +106,8 @@ with open(
 n_alphas = len(alphas)
 error_l2_mean = np.empty(n_alphas)
 error_l2_std = np.empty(n_alphas)
-# error_l1_mean = np.empty(n_alphas)
-# error_l1_std = np.empty(n_alphas)
+error_l1_mean = np.empty(n_alphas)
+error_l1_std = np.empty(n_alphas)
 error_hub_mean = np.empty(n_alphas)
 error_hub_std = np.empty(n_alphas)
 
@@ -118,59 +121,59 @@ for idx, (al, regl2, regl1, reg_hub, a_hub) in enumerate(
         beta,
     )
 
-    find_coefficients_fun_args_l2 = (regl2,)
+    # find_coefficients_fun_args_l2 = (regl2,)
 
-    error_l2_mean[idx], error_l2_std[idx] = _find_numerical_mean_std(
-        al,
-        measure_gen_decorrelated,
-        find_coefficients_L2,
-        d,
-        10,
-        measure_fun_args,
-        find_coefficients_fun_args_l2,
-    )
-
-    # find_coefficients_fun_args_l1 = (regl1,)
-
-    # error_l1_mean[idx], error_l1_std[idx] = _find_numerical_mean_std(
+    # error_l2_mean[idx], error_l2_std[idx] = _find_numerical_mean_std(
     #     al,
     #     measure_gen_decorrelated,
-    #     find_coefficients_L1,
+    #     find_coefficients_L2,
     #     d,
     #     10,
     #     measure_fun_args,
-    #     find_coefficients_fun_args_l1,
+    #     find_coefficients_fun_args_l2,
     # )
 
-    find_coefficients_fun_args_hub = (reg_hub, a_hub)
+    find_coefficients_fun_args_l1 = (regl1,)
 
-    error_hub_mean[idx], error_hub_std[idx] = _find_numerical_mean_std(
+    error_l1_mean[idx], error_l1_std[idx] = _find_numerical_mean_std(
         al,
         measure_gen_decorrelated,
-        find_coefficients_Huber,
+        find_coefficients_L1,
         d,
         10,
         measure_fun_args,
-        find_coefficients_fun_args_hub,
+        find_coefficients_fun_args_l1,
     )
 
+    # find_coefficients_fun_args_hub = (reg_hub, a_hub)
+
+    # error_hub_mean[idx], error_hub_std[idx] = _find_numerical_mean_std(
+    #     al,
+    #     measure_gen_decorrelated,
+    #     find_coefficients_Huber,
+    #     d,
+    #     10,
+    #     measure_fun_args,
+    #     find_coefficients_fun_args_hub,
+    # )
+
 np.savetxt(
-    "./data/numerics_sweep_alpha_just_l2_hub_fixed_eps_{:.2f}_beta_{:.2f}_delta_large_{:.2f}_delta_small_{:.2f}_dim_{:.2f}.csv".format(
-        p, beta, delta_large, delta_small, d
+    "./data/numerics_sweep_alpha_just_l1_fixed_eps_{:.2f}_beta_{:.2f}_delta_large_{:.2f}_delta_small_{:.2f}_dim_{:.2f}_from_{:.2f}_to_{:.2f}.csv".format(
+        p, beta, delta_large, delta_small, d, lower_bound, upper_bound
     ),
     np.vstack(
         (
             np.array(alphas),
-            error_l2_mean,
-            error_l2_std,
-            # error_l1_mean,
-            # error_l1_std,
-            error_hub_mean,
-            error_hub_std
+            # error_l2_mean,
+            # error_l2_std,
+            error_l1_mean,
+            error_l1_std,
+            # error_hub_mean,
+            # error_hub_std
         )
     ).T,
     delimiter=",",
-    header="alpha,l2_mean,l2_std,hub_mean,hub_std",
+    header="alpha,l1_mean,l1_std",
 )
 
 print("Done.")
