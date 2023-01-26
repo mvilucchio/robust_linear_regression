@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import src.plotting_utils as pu
 from scipy.special import erf
 from src.fpeqs import different_alpha_observables_fpeqs, _find_fixed_point
 from src.fpeqs_Huber import (
@@ -14,18 +15,29 @@ from src.optimal_lambda import (
 
 if __name__ == "__main__":
 
-    delta_small = 0.1
+    save = True
+    width = 1.0 * 458.63788
+
+    alpha_cut = 10.0
+    delta_small = 1.0
+    beta = 0.0
     delta_large = 10.0
     percentage = 0.3
-    beta = 0.3
-    # a = 1.0
-    # var_hat_kwargs = {
-    #     "delta_small": delta_small,
-    #     "delta_large": delta_large,
-    #     "percentage": percentage,
-    #     "beta": beta,
-    #     "a": a,
-    # }
+
+    UPPER_BOUND = 1e10
+    LOWER_BOUND = 1e6
+
+    pu.initialization_mpl()
+
+    tuple_size = pu.set_size(width, fraction=0.50)
+
+    fig, ax = plt.subplots(1, 1, figsize=tuple_size)
+    fig.subplots_adjust(left=0.16)
+    fig.subplots_adjust(bottom=0.16)
+    fig.subplots_adjust(top=0.97)
+    fig.subplots_adjust(right=0.97)
+    
+
     var_hat_kwargs = {
         "delta_small": delta_small,
         "delta_large": delta_large,
@@ -43,9 +55,9 @@ if __name__ == "__main__":
 
     (alphas, errors, lambdas, huber_params,) = no_parallel_optimal_reg_param_and_huber_parameter(
         var_hat_func=var_hat_func_Huber_decorrelated_noise,
-        alpha_1=10000,
-        alpha_2=10000000000,
-        n_alpha_points=150,
+        alpha_1=LOWER_BOUND,
+        alpha_2=UPPER_BOUND,
+        n_alpha_points=500,
         initial_cond=initial_condition,
         var_hat_kwargs=var_hat_kwargs,
     )
@@ -102,17 +114,35 @@ if __name__ == "__main__":
     print("sigmahats ", log_difference(sigmahats[-1],sigmahats[-10],alphas[-1],alphas[-10]))
     print("huber_param ", log_difference(huber_params[-1],huber_params[-10],alphas[-1],alphas[-10]))
 
-    plt.plot(alphas, ms, label="m")
-    plt.plot(alphas, qs, label="qs[idx]")
-    plt.plot(alphas, sigmas, label="sigma")
-    plt.plot(alphas, mhats, label="mhat")
-    plt.plot(alphas, qhats, label="qhat")
-    plt.plot(alphas, sigmahats, label="sigmahat")
-    plt.plot(alphas, huber_params, label="huber_parrams")
-    plt.title("Delta_small {} Delta_large {} eps {} beta {}".format(delta_small, delta_large, percentage, beta))
-    plt.xscale("log")
-    plt.yscale("log")
-    plt.grid(which='both')
-    plt.legend()
+    ax.plot(alphas, ms, label=r"$m$")
+    ax.plot(alphas, qs, label=r"$q$")
+    ax.plot(alphas, sigmas, label=r"$\Sigma$")
+    ax.plot(alphas, mhats, label=r"$\hat{m}$")
+    ax.plot(alphas, qhats, label=r"$\hat{q}$")
+    ax.plot(alphas, sigmahats, label=r"$\hat{\Sigma}$")
+    ax.plot(alphas, huber_params, label=r"$a_{\text{opt}}$")
+
+    ax.set_xlabel(r"$\alpha$", labelpad=2.0)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim([LOWER_BOUND, UPPER_BOUND])
+    # ax_2.set_ylim([1e-7, 1.5])
+    ax.legend(ncol=2, handlelength=1.0)
+
+    ax.tick_params(axis="y", pad=2.0)
+    ax.tick_params(axis="x", pad=2.0)
+
+    # ax.set_xticks([0.0001, 0.001, 0.01, 0.1, 0.5])
+    # ax_2.set_xticklabels([r"$10^{-4}$", r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$0.5$"])
+
+    if save:
+        pu.save_plot(
+            fig,
+            "sweep_delta_fixed_epsilon_optimal_params_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}_delta_small_{:.2f}".format(  # "a_hub_sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}".format( # "sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}".format(
+                delta_large, beta, alpha_cut, delta_small
+            ),
+        )
+
+    plt.show()
 
     plt.show()

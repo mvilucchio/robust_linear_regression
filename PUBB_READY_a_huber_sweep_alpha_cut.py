@@ -38,12 +38,12 @@ MAX_ITER = 2500
 XATOL = 1e-8
 FATOL = 1e-8
 
-save = False
+save = True
 width = 1.0 * 458.63788
 # width = 398.3386
 random_number = np.random.randint(100)
 
-alpha_cut = 10.0
+alpha_cut = 1.0
 delta_small = 0.1
 delta_large = 5.0
 beta = 1.0
@@ -56,7 +56,7 @@ tuple_size = pu.set_size(width, fraction=0.49)
 fig, ax = plt.subplots(1, 1, figsize=tuple_size)
 fig.subplots_adjust(left=0.2)
 fig.subplots_adjust(bottom=0.2)
-fig.subplots_adjust(top=0.99)
+fig.subplots_adjust(top=0.9)
 fig.subplots_adjust(right=0.96)
 
 # -----------
@@ -130,116 +130,117 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
 
 # -------------------
 
-N = 100
+N = 50
 # epsilons = np.linspace(0.0, 0.5, N)
 # epsilons = np.logspace(-4, np.log10(0.5), N)
-a_hub = np.logspace(-3, 1, N)
+a_hub = np.logspace(-3, 2, N)
 l2_err = np.empty(len(a_hub))
 l1_err = np.empty(len(a_hub))
 huber_err = np.empty(len(a_hub))
 bo_err = np.empty(len(a_hub))
 
-for idx, a in enumerate(a_hub):
-    while True:
-        m = 0.89 * np.random.random() + 0.1
-        q = 0.89 * np.random.random() + 0.1
-        sigma = 0.89 * np.random.random() + 0.1
-        if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
-            initial_condition = [m, q, sigma]
-            break
+params = {
+    "delta_small": delta_small,
+    "delta_large": delta_large,
+    "percentage": float(eps),
+    "beta": beta,
+}
 
-    params = {
-        "delta_small": delta_small,
-        "delta_large": delta_large,
-        "percentage": float(eps),
-        "beta": beta,
-    }
+while True:
+    m = 0.89 * np.random.random() + 0.1
+    q = 0.89 * np.random.random() + 0.1
+    sigma = 0.89 * np.random.random() + 0.1
+    if np.square(m) < q + delta_small * q and np.square(m) < q + delta_large * q:
+        initial_condition = [m, q, sigma]
+        break
 
-    l2_err[idx], _ = _find_optimal_reg_param_gen_error(
+
+l2_err, _ = _find_optimal_reg_param_gen_error(
+    alpha_cut,
+    var_func_L2,
+    var_hat_func_L2_decorrelated_noise,
+    initial_condition,
+    params,
+    0.5,
+)
+
+l1_err, _ = _find_optimal_reg_param_gen_error(
+    alpha_cut,
+    var_func_L2,
+    var_hat_func_L1_decorrelated_noise,
+    initial_condition,
+    params,
+    0.5,
+)
+
+pup = {
+    "delta_small": delta_small,
+    "delta_large": delta_large,
+    "percentage": float(eps),
+    "beta": beta,
+}
+m, q, sigma = fp._find_fixed_point(
+    alpha_cut,
+    var_func_BO,
+    var_hat_func_BO_num_decorrelated_noise,
+    1.0,
+    initial_condition,
+    pup,
+)
+bo_err = 1 - 2 * m + q
+print("done l2")
+last_lambda = 1
+for idx, a in enumerate(a_hub[::-1]):
+    params.update({'a':a})
+    huber_err[len(huber_err) - idx - 1], lam = _find_optimal_reg_param_gen_error(
         alpha_cut,
         var_func_L2,
-        var_hat_func_L2_decorrelated_noise,
-        initial_condition,
-        params,
-        0.5,
-    )
-    print("done l2 {}".format(idx))
-
-    l1_err[idx], _ = _find_optimal_reg_param_gen_error(
-        alpha_cut,
-        var_func_L2,
-        var_hat_func_L1_decorrelated_noise,
-        initial_condition,
-        params,
-        0.5,
-    )
-    print("done l1 {}".format(idx))
-
-    huber_err[idx], _, _ = _find_optimal_reg_param_and_huber_parameter_gen_error(
-        alpha_cut,
         var_hat_func_Huber_decorrelated_noise,
         initial_condition,
         params,
-        [0.5, 0.1],
+        last_lambda,
     )
+    print(lam)
+    last_lambda = lam
     print("done hub {}".format(idx))
+        
 
-    if eps == 0.0:
-        ppp = {
-            "delta": delta_small,
-        }
-        m, q, sigma = fp._find_fixed_point(
-            alpha_cut, var_func_BO, var_hat_func_BO_single_noise, 1.0, initial_condition, ppp
-        )
-    else:
-        pup = {
-            "delta_small": delta_small,
-            "delta_large": delta_large,
-            "percentage": float(eps),
-            "beta": beta,
-        }
-        m, q, sigma = fp._find_fixed_point(
-            alpha_cut,
-            var_func_BO,
-            var_hat_func_BO_num_decorrelated_noise,
-            1.0,
-            initial_condition,
-            pup,
-        )
-    bo_err[idx] = 1 - 2 * m + q
-
-np.savetxt(
-    "./data/sweep_a_hub_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}.csv".format(
-        delta_large, beta, alpha_cut
-    ), 
-    np.vstack((epsilons, l2_err, l1_err, huber_err, bo_err)).T, 
-    delimiter=",",
-    header="epsilons,l2,l1,Huber,BO"
-)
+# np.savetxt(
+#     "./data/sweep_a_hub_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}.csv".format(
+#         delta_large, beta, alpha_cut
+#     ), 
+#     np.vstack((a_hub, l2_err, l1_err, huber_err, bo_err)).T, 
+#     delimiter=",",
+#     header="epsilons,l2,l1,Huber,BO"
+# )
 
 print("done bo {}".format(idx))
 
-ax.plot(epsilons, l2_err, label=r"$\ell_2$")
-ax.plot(epsilons, l1_err, label=r"$\ell_1$")
-ax.plot(epsilons, huber_err, label="Huber")
-ax.plot(epsilons, bo_err, label="BO")
+ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0), useOffset=True)
+
+ax.axhline(y=l2_err, xmin=0.0,xmax=1.0,label=r"$\ell_2$", color="tab:blue")
+ax.axhline(y=l1_err, xmin=0.0,xmax=1.0,label=r"$\ell_1$", color="tab:orange")
+ax.axhline(y=bo_err, xmin=0.0,xmax=1.0,label="BO", color="tab:red")
+
+ax.plot(a_hub, huber_err, label="Huber", color="tab:green")
+
 ax.set_ylabel(r"$E_{\text{gen}}$")
-ax.set_xlabel(r"$\epsilon$")
+ax.set_xlabel(r"$a$")
 ax.set_xscale("log")
-ax.set_yscale("log")
-ax.set_xlim([0.0001, 0.5])
-# ax.set_ylim([0.009, 1.5])
+# ax.set_yscale("log")
+ax.set_xlim([a_hub[0],a_hub[-1]])
+# ax.set_ylim([0.09, 1.2])
 ax.legend(ncol=2)
 
-ax.set_xticks([0.0001, 0.001, 0.01, 0.1, 0.5])
-ax.set_xticklabels([r"$10^{-4}$", r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$0.5$"])
+# ax.set_xticks([0.0001, 0.001, 0.01, 0.1, 0.5])
+# ax.set_xticklabels([r"$10^{-4}$", r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$0.5$"])
 
 
 if save:
     pu.save_plot(
         fig,
-        "sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}".format(
-            delta_large, beta, alpha_cut
+        "sweep_a_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}_delta_small_{:.2f}".format(
+            delta_large, beta, alpha_cut, delta_small
         ),
     )
 

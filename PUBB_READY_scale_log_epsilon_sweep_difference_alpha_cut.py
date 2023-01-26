@@ -50,15 +50,16 @@ beta = 0.0
 
 pu.initialization_mpl()
 
-tuple_size = pu.set_size(width, fraction=0.49)
+tuple_size = pu.set_size(width, fraction=0.50)
 
 fig, ax = plt.subplots(1, 1, figsize=tuple_size)
-fig.subplots_adjust(left=0.2)
-fig.subplots_adjust(bottom=0.2)
-fig.subplots_adjust(top=0.99)
-fig.subplots_adjust(right=0.96)
+fig.subplots_adjust(left=0.16)
+fig.subplots_adjust(bottom=0.2283)
+fig.subplots_adjust(top=0.91)
+fig.subplots_adjust(right=0.95)
 
 # -----------
+
 
 def _find_optimal_reg_param_gen_error(
     alpha, var_func, var_hat_func, initial_cond, var_hat_kwargs, inital_value
@@ -128,20 +129,16 @@ def _find_optimal_reg_param_and_huber_parameter_gen_error(
 
 # -------------------
 
-N = 40
-# epsilons = np.linspace(0.0, 0.5, N)
-epsilons = np.logspace(np.log10(0.000005),-3, N)
-l2_err = np.empty(len(epsilons))
-l1_err = np.empty(len(epsilons))
-huber_err = np.empty(len(epsilons))
-a_hub = np.empty(len(epsilons))
-bo_err = np.empty(len(epsilons))
+N=40
+epsilons_inset = np.logspace(-6, -3, N)
+huber_err_inset = np.empty(len(epsilons_inset))
+a_hub_inset = np.empty(len(epsilons_inset))
+bo_err_inset = np.empty(len(epsilons_inset))
 
-difference_hub = np.empty(len(epsilons))
-difference_l2 =np.empty(len(epsilons))
+difference_hub_inset = np.empty(len(epsilons_inset))
 
-for idx, eps in enumerate(epsilons):
-    print(eps)
+for idx, eps in enumerate(tqdm(epsilons_inset)):
+
     while True:
         m = 0.89 * np.random.random() + 0.1
         q = 0.89 * np.random.random() + 0.1
@@ -157,53 +154,18 @@ for idx, eps in enumerate(epsilons):
         "beta": beta,
     }
 
-    l2_err[idx], _ = _find_optimal_reg_param_gen_error(
-        alpha_cut,
-        var_func_L2,
-        var_hat_func_L2_decorrelated_noise,
-        initial_condition,
-        params,
-        0.5,
-    )
-    print("done l2 {}".format(idx))
-
-    l1_err[idx], _ = _find_optimal_reg_param_gen_error(
-        alpha_cut,
-        var_func_L2,
-        var_hat_func_L1_decorrelated_noise,
-        initial_condition,
-        params,
-        0.5,
-    )
-    print("done l1 {}".format(idx))
-
     if eps < 0.001:
         aaa = 10
     else:
         aaa = 1
-    huber_err[idx], _, a_hub[idx] = _find_optimal_reg_param_and_huber_parameter_gen_error(
+
+    huber_err_inset[idx], _, a_hub_inset[idx] = _find_optimal_reg_param_and_huber_parameter_gen_error(
         alpha_cut,
         var_hat_func_Huber_decorrelated_noise,
         initial_condition,
         params,
         [0.01, aaa],
     )
-    params = {
-        "delta_small": delta_small,
-        "delta_large": delta_large,
-        "percentage": float(eps),
-        "beta": beta,
-        "a": 10
-    }
-    huber_err[idx], _ = _find_optimal_reg_param_gen_error(
-        alpha_cut,
-        var_func_L2,
-        var_hat_func_Huber_decorrelated_noise,
-        initial_condition,
-        params,
-        0.5,
-    )
-    print("done hub {}".format(idx))
 
     if eps == 0.0:
         ppp = {
@@ -227,82 +189,36 @@ for idx, eps in enumerate(epsilons):
             initial_condition,
             pup,
         )
-    bo_err[idx] = 1 - 2 * m + q
-    print("done bo {}".format(idx))
+    bo_err_inset[idx] = 1 - 2 * m + q
 
-    difference_hub[idx]= huber_err[idx]- bo_err[idx]
-    difference_l2[idx]= l2_err[idx]- bo_err[idx]
+    difference_hub_inset[idx] = huber_err_inset[idx] - bo_err_inset[idx]
 
-np.savetxt(
-    "./data/sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}.csv".format(
-        delta_large, beta, alpha_cut
-    ),
-    np.vstack((epsilons, l2_err, l1_err, huber_err, bo_err)).T,
-    delimiter=",",
-    header="epsilons,l2,l1,Huber,BO",
-)
-
-print(a_hub)
-
-# ax.plot(epsilons, l2_err - bo_err, label=r"$\ell_2$")
-# ax.plot(epsilons, l1_err - bo_err, label=r"$\ell_1$")
-# ax.plot(epsilons, huber_err - bo_err, label="Huber")
-# # ax.plot(epsilons, bo_err, label="BO")
-
-# # ax.plot(epsilons, l2_err, label=r"$\ell_2$")
-# # ax.plot(epsilons, l1_err, label=r"$\ell_1$")
-# # ax.plot(epsilons, huber_err, label="Huber")
-# # ax.plot(epsilons, bo_err, label="BO")
-# ax.set_ylabel(r"$E_{\text{gen}} - E_{\text{gen}}^{BO}$")
-# # ax.set_ylabel(r"$E_{\text{gen}}$")
-# ax.set_xlabel(r"$\epsilon$")
-# ax.set_xscale("log")
-# ax.set_yscale("log")
-# ax.set_xlim([0.0001, 0.5])
-# # ax.set_ylim([0.009, 1.5])
-# ax.legend(ncol=2)
-
-# ax.set_xticks([0.0001, 0.001, 0.01, 0.1, 0.5])
-# ax.set_xticklabels([r"$10^{-4}$", r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$0.5$"])
-
-# def fun(x, a, b):
-#     return a*x+b
-
-# popt, pcov = curve_fit(fun, np.log10(epsilons), np.log10(difference_hub), [1.0, -5])
-
-# print(popt)
-# print(pcov)
-
-# string_to_annotate = "{:.2f}".format(popt[0]) + "\pm" + "{:.2f}".format(np.sqrt(pcov[0,0]))
-# exponent = 0.898
-# ax.annotate(r"$0.898 \pm 0.001$", (1e-3,1e-5))
-
-# x = np.logspace(5e-4,5e-5,20)
-# y=x**exponent
-# ax.plot(x,y,'--')
+# width, hieght = pu.set_size(0.5, fraction=0.49)
 
 
-# ax.plot(np.sqrt(np.log10(1/epsilons)), a_hub, label="Huber")
-ax.plot(epsilons, )
+ax.plot(epsilons_inset * np.log(1 / epsilons_inset), difference_hub_inset, color='tab:orange', label="Huber", marker='.', linewidth=0.0)
+ax.set_xlabel(r"$ -\epsilon \log(\epsilon)$")
+ax.set_ylabel(r"$E_{\text{gen}}^{\text{Huber}} - E_{\text{gen}}^{\text{BO}}$")
 
-ax.set_ylabel(r"$a_{\text{opt}}$")
-# ax.set_ylabel(r"$E_{\text{gen}}$")
-ax.set_xlabel(r"$\epsilon$")
-# ax.set_xscale("log")
-# ax.set_yscale("log")
-# ax.set_xlim([0.0001, 0.5])
-# ax.set_ylim([0.009, 1.5])
-# ax.legend(ncol=2)
+def fun(x, a, b):
+    return x * a + b
+
+popt, pcov = curve_fit(fun, epsilons_inset * np.log(1 / epsilons_inset), difference_hub_inset, p0=[0.01, 0.01])
+
+print("fit done")
+print(popt)
+print(pcov)
+
+xs = np.linspace(0.0, 0.007, 30)
+ax.plot(xs, fun(xs, *popt), label="Linear Fit", color='black', linestyle='solid')
+ax.set_xlim([0.0, 0.007])
 
 if save:
     pu.save_plot(
         fig,
-        "a_hub_sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}".format( # "sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}".format(
-            delta_large, beta, alpha_cut
+        "sweep_eps_scaling_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}_delta_small_{:.2f}".format(  # "a_hub_sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}".format( # "sweep_eps_fixed_delta_{:.2f}_beta_{:.2f}_alpha_cut_{:.2f}".format(
+            delta_large, beta, alpha_cut, delta_small
         ),
     )
 
 plt.show()
-
-# plt.plot(np.log10(epsilons), np.log10(difference_hub))
-# plt.show()

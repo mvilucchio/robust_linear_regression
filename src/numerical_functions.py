@@ -15,8 +15,8 @@ from src.integration_utils import (
 )
 
 MULT_INTEGRAL = 9
-EPSABS = 1e-8
-EPSREL = 1e-8
+EPSABS = 1e-12
+EPSREL = 1e-12
 
 
 @njit(error_model="numpy", fastmath=True)
@@ -1563,11 +1563,11 @@ def q_hat_equation_BO_decorrelated_noise(
     #     borders, border_BO, test_fun_BO, args, args
     # )
     if delta_large <= 0.11 * delta_small:
-        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=50)
+        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=10)
     elif delta_large <= 0.5 * delta_small:
-        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=40)
+        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=7)
     elif delta_large <= delta_small:
-        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=30)
+        domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=5)
     else: # delta_large <= delta_small:
         domain_xi, domain_y = divide_integration_borders_multiple_grid(borders, N=3)
     # else:
@@ -1576,7 +1576,7 @@ def q_hat_equation_BO_decorrelated_noise(
     #         borders, border_BO, test_fun_BO, args, args
     #     )
 
-    print(len(domain_xi))
+    # print(len(domain_xi))
 
     integral_value = 0.0
     for xi_funs, y_funs in zip(domain_xi, domain_y):

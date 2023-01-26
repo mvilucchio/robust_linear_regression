@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 # from mpi4py.futures import MPIPoolExecutor as Pool
 
 BLEND = 0.75
-TOL_FPE = 1e-10
+TOL_FPE = 1e-11
 
 
 def state_equations(var_func, var_hat_func, reg_param, alpha, init, var_hat_kwargs):
@@ -34,7 +34,8 @@ def state_equations(var_func, var_hat_func, reg_param, alpha, init, var_hat_kwar
         m = BLEND * m + (1 - BLEND) * temp_m
         q = BLEND * q + (1 - BLEND) * temp_q
         sigma = BLEND * sigma + (1 - BLEND) * temp_sigma
-
+        
+        # print(err)
         # print(
         #     "  err: {:.8f} alpha : {:.2f} m = {:.9f}; q = {:.9f}; \[CapitalSigma] = {:.9f}".format(
         #         err, alpha, m, q, sigma

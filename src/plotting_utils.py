@@ -2,7 +2,7 @@ import os
 import datetime as dt
 import matplotlib.pyplot as plt
 
-IMG_DIRECTORY = "./imgs" # "/Volumes/LaCie/final_imgs_hproblem/new3/new5"  #  "./imgs" #  #  # "/Volumes/LaCie/final_imgs_hproblem" #
+IMG_DIRECTORY = "./imgs/final" # "/Volumes/LaCie/final_imgs_hproblem/new3/new5"  #  "./imgs" #  #  # "/Volumes/LaCie/final_imgs_hproblem" #
 STYLES_DIRECTORY = "./src/mpl_styles"
 
 
@@ -37,5 +37,24 @@ def set_size(width, fraction=1, subplots=(1, 1)):
 
     fig_width_in = fig_width_pt * inches_per_pt
     fig_height_in = fig_width_in * (golden_ratio) * (subplots[0] / subplots[1])
+
+    return (fig_width_in, fig_height_in)
+
+
+def set_size_square(width, fraction=1, subplots=(1, 1)):
+    if width == "thesis":
+        width_pt = 426.79135
+    elif width == "beamer":
+        width_pt = 307.28987
+    else:
+        width_pt = width
+
+    fig_width_pt = width_pt * fraction
+    inches_per_pt = 1 / 72.27
+
+    golden_ratio = (5 ** 0.5 - 1) / 2
+
+    fig_width_in = fig_width_pt * inches_per_pt
+    fig_height_in = fig_width_pt * inches_per_pt # * (golden_ratio) * (subplots[0] / subplots[1])
 
     return (fig_width_in, fig_height_in)
